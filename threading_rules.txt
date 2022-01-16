@@ -1,0 +1,28 @@
+// Actions
+[1] threaded folder actions 
+- mass renaming
+- regex scanning
+- database cache loading
+
+[2] non-threaded folder actions
+- select series_id (seeds database cache loading)
+
+[3] non-threaded project actions
+- rescan for all folder additions and deletions (refreshes app so can be blocking)
+
+[4] threaded project actions
+- rescan for folder additions (inplace addition so can be threaded)
+ 
+[1,2] and [3] are exclusive
+- FOLDER_BUSY_FLAG per folder 
+- N_FOLDER_BUSY_COUNT in app
+
+(One action per folder)
+
+// Locks
+- Mutex on folder by UI and actions
+- Mutex on folders by UI and actions
+
+(Actions should perform operation immutably, then update data at end of call)
+
+
