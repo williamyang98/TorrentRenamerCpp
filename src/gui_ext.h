@@ -5,7 +5,6 @@
 namespace app::gui 
 {
 
-void RenderSeriesList(App &main_app);
-void RenderEpisodes(App &main_app, SeriesFolder &folder);
+void RenderApp(App &main_app);
 
 };

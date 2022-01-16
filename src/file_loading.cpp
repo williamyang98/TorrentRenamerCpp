@@ -7,11 +7,14 @@
 #include <array>
 
 #include <iostream>
+#include <exception>
 
 #include <rapidjson/reader.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
+
+#include <fmt/format.h>
 
 #include "file_loading.h"
 
@@ -54,24 +57,41 @@ EpisodesMap load_series_episodes_info(const rapidjson::Document &doc) {
     return episodes;
 }
 
+
+std::vector<SeriesInfo> load_search_info(const rapidjson::Document &doc) {
+    std::vector<SeriesInfo> series;
+
+    auto data = doc.GetArray();
+    series.reserve(data.Size());
+
+    for (auto &s: data) {
+        SeriesInfo o;
+        o.name = s["seriesName"].GetString();
+        o.air_date = s["firstAired"].GetString();
+        o.status = s["status"].GetString();
+        o.id = s["id"].GetUint();
+        series.push_back(o);
+    }
+    
+    return series;
+}
+
 app_schema_t load_app_schema_from_buffer(const char *data) {
     app_schema_t schema;
 
     rapidjson::Document doc;
     doc.Parse(data);
 
-    static std::array<const char *, 3> REQUIRED_KEYS = 
-        {SCHEME_CRED_KEY, SCHEME_SERIES_KEY, SCHEME_EPISODES_KEY};
+    static std::array<const char *, 4> REQUIRED_KEYS = 
+        {SCHEME_CRED_KEY, SCHEME_SERIES_KEY, SCHEME_EPISODES_KEY, SCHEME_SEARCH_KEY};
     
     for (const auto &key: REQUIRED_KEYS) {
         if (!doc.HasMember(key)) {
-            std::cerr << "App schema missing key=" << key << std::endl;
-            exit(1);
+            throw std::runtime_error(fmt::format("App schema missing key ({})", key));
         }
 
         rapidjson::Document sub_doc;
         sub_doc.CopyFrom(doc[key], doc.GetAllocator());
-
         schema.emplace(std::string(key), sub_doc);
     }
 
@@ -81,8 +101,7 @@ app_schema_t load_app_schema_from_buffer(const char *data) {
 app_schema_t load_schema_from_file(const char *schema_fn) {
     std::ifstream file(schema_fn);
     if (!file.is_open()) {
-        std::cerr << "Credentials schema missing: " << schema_fn << std::endl;
-        exit(1);
+        throw std::runtime_error(fmt::format("Schema file missing at filename=({})", schema_fn));
     }
 
     std::stringstream ss;
@@ -92,30 +111,35 @@ app_schema_t load_schema_from_file(const char *schema_fn) {
     return app::load_app_schema_from_buffer(ss.str().c_str());
 }
 
-void validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc, const char *label) {
+bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {
     rapidjson::SchemaValidator validator(schema_doc);
     if (!doc.Accept(validator)) {
-        std::cerr << "Doc doesn't match schema (" << label << ")" << std::endl;
+        std::cerr << "Doc doesn't match schema" << std::endl;
 
         rapidjson::StringBuffer sb;
         validator.GetInvalidDocumentPointer().StringifyUriFragment(sb);
-        std::cout << "document pointer: " << sb.GetString() << std::endl;
-        std::cout << "error-type: " << validator.GetInvalidSchemaKeyword() << std::endl;
+        std::cerr << "document pointer: " << sb.GetString() << std::endl;
+        std::cerr << "error-type: " << validator.GetInvalidSchemaKeyword() << std::endl;
         sb.Clear();
 
         validator.GetInvalidSchemaPointer().StringifyUriFragment(sb);
-        std::cout << "schema pointer: " << sb.GetString() << std::endl;
+        std::cerr << "schema pointer: " << sb.GetString() << std::endl;
         sb.Clear();
 
-        exit(1);
+        return false;
     }
+
+    return true;
 }
 
-rapidjson::Document load_document_from_file(const char *fn) {
+DocumentLoadResult load_document_from_file(const char *fn) {
+    DocumentLoadResult res;
+
     std::ifstream file(fn);
     if (!file.is_open()) {
         std::cout << "Unable to open file: " << fn << std::endl; 
-        exit(1);
+        res.code = DocumentLoadCode::FILE_NOT_FOUND;
+        return res;
     }
 
     std::stringstream ss;
@@ -124,7 +148,10 @@ rapidjson::Document load_document_from_file(const char *fn) {
 
     rapidjson::Document doc;
     doc.Parse(ss.str().c_str());
-    return doc;
+
+    res.code = DocumentLoadCode::OK;
+    res.doc = std::move(doc);
+    return res;
 }
 
 void write_json_to_stream(const rapidjson::Document &doc, std::ostream &os) {
@@ -136,15 +163,15 @@ void write_json_to_stream(const rapidjson::Document &doc, std::ostream &os) {
     os << sb.GetString() << std::endl;
 }
 
-void write_document_to_file(const char *fn, const rapidjson::Document &doc) {
+bool write_document_to_file(const char *fn, const rapidjson::Document &doc) {
     std::ofstream file(fn);
     if (!file.is_open()) {
-        std::cout << "Unable to open file: " << fn << std::endl; 
-        exit(1);
+        return false;
     }
 
     write_json_to_stream(doc, file);
     file.close();
+    return true;
 }
 
 };

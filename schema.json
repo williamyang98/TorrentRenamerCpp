@@ -19,6 +19,21 @@
     },
     "required": ["credentials"]
   },
+  "search_data": {
+    "title": "tvdb search data",
+    "description": "TVDB search data",
+    "type": "array",
+    "items": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "number", "exclusiveMinimum": 0 },
+        "seriesName": { "type": "string" },
+        "firstAired": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "seriesName", "firstAired", "status"]
+    }
+  },
   "series_data": {
     "title": "tvdb series data",
     "description": "TVDB series data",

@@ -63,35 +63,21 @@ bool refresh_token(const char *token) {
     return (r.status_code == 200);
 }
 
-std::vector<SeriesSearchResult> search_series(const char *name, const char *token) {
+std::optional<rapidjson::Document> search_series(const char *name, const char *token) {
     auto r = cpr::Get(
         cpr::Url(BASE_URL "search/series"),
         create_token_header(token),
         cpr::Parameters{{"name", name}}
     );
 
-    auto series = std::vector<SeriesSearchResult>();
-
     if (r.status_code != 200) {
-        return series;
+        return {};
     }
 
-    // print_response(r);
     rapidjson::Document doc;
     doc.Parse(r.text.c_str());
-
-    auto data = doc["data"].GetArray();
-    series.reserve(data.Size());
-
-    for (auto &s: data) {
-        SeriesSearchResult o;
-        o.name = s["seriesName"].GetString();
-        o.date = s["firstAired"].GetString();
-        o.id = s["id"].GetUint();
-        series.push_back(o);
-    }
-    
-    return series;
+    doc.Swap(doc["data"]);
+    return doc;
 }
 
 std::optional<rapidjson::Document> get_series(sid_t id, const char *token) {
