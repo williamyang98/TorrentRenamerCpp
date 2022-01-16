@@ -13,7 +13,7 @@ namespace app
 // pending rename
 // user is free to modify dest
 struct PendingFile {
-    const std::string target;
+    std::string target;
     std::string dest;
     bool active;
 };
@@ -23,7 +23,7 @@ typedef std::unordered_map<std::string, std::vector<PendingFile>> ConflictFiles;
 
 // delete a file
 struct DeleteFile {
-    const std::string filename;
+    std::string filename;
     bool active;
 };
 

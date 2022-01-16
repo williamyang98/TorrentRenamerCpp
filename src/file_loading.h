@@ -10,6 +10,7 @@
 #define SCHEME_CRED_KEY     "credentials_file" 
 #define SCHEME_SERIES_KEY   "series_data" 
 #define SCHEME_EPISODES_KEY "episodes_data"
+#define SCHEME_SEARCH_KEY   "search_data"
 
 namespace app
 {
@@ -68,13 +69,23 @@ struct TVDB_Cache {
 
 SeriesInfo load_series_info(const rapidjson::Document &doc);
 EpisodesMap load_series_episodes_info(const rapidjson::Document &doc);
+std::vector<SeriesInfo> load_search_info(const rapidjson::Document &doc);
 
 app_schema_t load_app_schema_from_buffer(const char *data);
 app_schema_t load_schema_from_file(const char *schema_fn);
-void validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc, const char *label);
+bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc);
 
-rapidjson::Document load_document_from_file(const char *fn);
+// document loading handling
+enum DocumentLoadCode {
+    OK, FILE_NOT_FOUND
+};
+struct DocumentLoadResult {
+   DocumentLoadCode code;
+   rapidjson::Document doc; 
+};
+DocumentLoadResult load_document_from_file(const char *fn);
+
 void write_json_to_stream(const rapidjson::Document &doc, std::ostream &os);
-void write_document_to_file(const char *fn, const rapidjson::Document &doc);
+bool write_document_to_file(const char *fn, const rapidjson::Document &doc);
 
 };

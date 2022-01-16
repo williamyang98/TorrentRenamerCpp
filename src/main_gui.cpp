@@ -18,6 +18,7 @@
 
 #include "app.h"
 #include "gui_ext.h"
+#include "font_awesome_definitions.h"
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -84,6 +85,12 @@ int main(int argc, char **argv)
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.Fonts->AddFontDefault();
+    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+    ImFontConfig icons_config; 
+    icons_config.MergeMode = true; 
+    icons_config.PixelSnapH = true;
+    io.Fonts->AddFontFromFileTTF("font_awesome.ttf", 16.0f, &icons_config, icons_ranges);
 
     // Setup Dear ImGui style
     // ImGui::StyleColorsDark();
@@ -95,7 +102,7 @@ int main(int argc, char **argv)
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Our state
-    bool show_demo_window = false;
+    bool show_demo_window = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     app::App main_app;
@@ -116,29 +123,10 @@ int main(int argc, char **argv)
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+        // Render app
         {
-            ImGui::Begin("Series");
-            app::gui::RenderSeriesList(main_app);
-            ImGui::End();
+            app::gui::RenderApp(main_app);
         }
-
-        // 3. Show episodes window
-        {
-            ImGui::Begin("Episodes");
-
-            auto folder_ptr = main_app.get_selected_folder();
-
-            if (folder_ptr != nullptr) {
-                auto &folder = *folder_ptr;
-                app::gui::RenderEpisodes(main_app, folder);
-            } else {
-                ImGui::Text("Select a series");
-            }
-
-            ImGui::End();
-        }
-
 
         // Rendering
         ImGui::Render();

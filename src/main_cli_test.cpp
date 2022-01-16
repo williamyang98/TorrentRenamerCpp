@@ -23,6 +23,8 @@
 namespace fs = std::filesystem;
 
 void scan_directory(const fs::path &subdir, app::app_schema_t &schema);
+void assert_validation(bool is_valid, const char *message);
+rapidjson::Document assert_document_load(app::DocumentLoadResult &res, const char *message);
 
 int main(int argc, char** argv) {
     if (argc == 1) {
@@ -31,10 +33,15 @@ int main(int argc, char** argv) {
     }
 
     auto schema_file = app::load_schema_from_file("schema.json");
-    auto cred_doc = app::load_document_from_file("credentials.json");
+    auto cred_doc = assert_document_load(
+        app::load_document_from_file("credentials.json"),
+        "Loading credentials file");
 
     auto &validator = schema_file.at(std::string(SCHEME_CRED_KEY));
-    app::validate_document(cred_doc, validator, "Credentials");
+    assert_validation(
+        app::validate_document(cred_doc, validator), 
+        "Credentials file");
+
     app::write_json_to_stream(cred_doc, std::cout);
 
     // Instrumentor::Get().BeginSession("Renaming");
@@ -58,6 +65,19 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+void assert_validation(bool is_valid, const char *message) {
+    std::cerr << "Failed validation (" << message << ")" << std::endl;
+    exit(1);
+}
+
+rapidjson::Document assert_document_load(app::DocumentLoadResult &res, const char *message) {
+    if (res.code != app::DocumentLoadCode::OK) {
+        std::cerr << "Failed to load document (" << message << ")" << std::endl;
+        exit(1);
+    }
+    return std::move(res.doc);
+}
+
 void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
     std::cout << "Scanning directory: " << subdir << std::endl;
 
@@ -66,18 +86,29 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
     // load from cache
     if (0) {
         const fs::path series_cache_fn = subdir / "series.json";
-        series_info = std::move(app::load_document_from_file(series_cache_fn.string().c_str()));
+        series_info = assert_document_load(
+            app::load_document_from_file(series_cache_fn.string().c_str()),
+            "Loading series file");
 
         const fs::path episodes_cache_fn = subdir / "episodes.json";
-        episodes_info = std::move(app::load_document_from_file(episodes_cache_fn.string().c_str()));
+        episodes_info = assert_document_load(
+            app::load_document_from_file(episodes_cache_fn.string().c_str()),
+            "Loading episodes file");
     
     // load from db
     } else {
-        auto cred_doc = app::load_document_from_file("credentials.json");
-        app::validate_document(cred_doc, schema.at(std::string(SCHEME_CRED_KEY)), "Valiating credentials");
+        auto cred_doc = assert_document_load(
+            app::load_document_from_file("credentials.json"),
+            "Loading credentials file");
+
+        assert_validation(
+            app::validate_document(cred_doc, schema.at(std::string(SCHEME_CRED_KEY))),
+            "Validating credentials file");
 
         const fs::path series_cache_fn = subdir / "series.json";
-        series_info = std::move(app::load_document_from_file(series_cache_fn.string().c_str()));
+        series_info = assert_document_load(
+            app::load_document_from_file(series_cache_fn.string().c_str()),
+            "Loading series file");
 
         std::string token;
         {
@@ -97,13 +128,6 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
         auto series_cache   = app::load_series_info(series_info);
         uint32_t id = series_cache.id;
 
-        // auto series_info_doc = tvdb_api::get_series(id, token.c_str());
-        // if (!series_info_doc) {
-        //     std::cerr << "Failed to get series info from tvdb" << std::endl;
-        //     exit(1);
-        // }
-        // series_info = std::move(series_info_doc.value());
-
         auto episodes_info_doc = tvdb_api::get_series_episodes(id, token.c_str());
         if (!episodes_info_doc) {
             std::cerr << "Failed to get episodes info from tvdb" << std::endl;
@@ -113,8 +137,13 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
         episodes_info = std::move(episodes_info_doc.value());
     }
 
-    app::validate_document(series_info, schema.at(std::string(SCHEME_SERIES_KEY)), "Validating series");
-    app::validate_document(episodes_info, schema.at(std::string(SCHEME_EPISODES_KEY)), "Validating episodes");
+    assert_validation(
+        app::validate_document(series_info, schema.at(std::string(SCHEME_SERIES_KEY))),
+        "Validating series info");
+
+    assert_validation(
+        app::validate_document(episodes_info, schema.at(std::string(SCHEME_EPISODES_KEY))),
+        "Validating episodes info");
 
     auto series_cache   = app::load_series_info(series_info);
     auto episodes_cache = app::load_series_episodes_info(episodes_info);

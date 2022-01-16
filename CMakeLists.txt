@@ -12,13 +12,16 @@ set(SRC_FILES
     src/se_regex.cpp
     src/file_loading.cpp
     src/renamer.cpp
-    src/app.cpp
 )
 
 add_executable(cli_test src/main_cli_test.cpp ${SRC_FILES})
 include_directories(cli_test src/)
 
-add_executable(main src/main_gui.cpp src/gui_ext.cpp ${SRC_FILES})
+set(GUI_FILES
+    src/app.cpp
+    src/gui_ext.cpp)
+
+add_executable(main src/main_gui.cpp ${GUI_FILES} ${SRC_FILES})
 include_directories(main src/)
 
 set_target_properties(cli_test PROPERTIES CXX_STANDARD 17)
