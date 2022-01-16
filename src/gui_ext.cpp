@@ -45,7 +45,7 @@ static FolderStatusCharacter GetFolderStatusCharacter(SeriesFolder::Status statu
     case SeriesFolder::Status::PENDING_DELETES: 
         return { ICON_FA_RECYCLE, ImColor(255,0,0) };
     case SeriesFolder::Status::CONFLICTS: 
-        return { ICON_FA_EXCLAMATION_TRIANGLE, ImColor(255,255,0) };
+        return { ICON_FA_EXCLAMATION_TRIANGLE, ImColor(255,215,0) };
     case SeriesFolder::Status::PENDING_RENAME: 
         return { ICON_FA_INFO_CIRCLE, ImColor(0,255,255) };
     case SeriesFolder::Status::COMPLETED: 
@@ -181,6 +181,14 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
     if (ImGui::Button("Download and refresh from tvdb")) {
         main_app.m_thread_pool.push([&folder, &main_app](int pid) {
             folder.refresh_cache(folder.m_cache.series.id, main_app.m_token.c_str());
+            folder.update_state();
+        });
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Execute changes")) {
+        main_app.m_thread_pool.push([&folder, &main_app](int pid) {
+            folder.execute_actions();
             folder.update_state();
         });
     }
