@@ -10,7 +10,7 @@
 
 #include "tvdb_api.h"
 #include "se_regex.h"
-#include "renamer.h"
+#include "scanner.h"
 #include "file_loading.h"
 #include "ctpl_stl.h"
 
@@ -60,6 +60,7 @@ public:
     bool load_cache();
     void update_state();
     bool search_series(const char *name, const char *token);
+    bool execute_actions();
 
 private:
     void push_error(std::string &str);

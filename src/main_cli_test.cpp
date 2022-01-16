@@ -17,7 +17,7 @@
 #include "console_colours.h"
 
 #include "tvdb_api.h"
-#include "renamer.h"
+#include "scanner.h"
 #include "file_loading.h"
 
 namespace fs = std::filesystem;

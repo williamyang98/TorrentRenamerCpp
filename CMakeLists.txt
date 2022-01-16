@@ -11,6 +11,7 @@ set(SRC_FILES
     src/tvdb_api.cpp
     src/se_regex.cpp
     src/file_loading.cpp
+    src/scanner.cpp
     src/renamer.cpp
 )
 

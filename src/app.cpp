@@ -8,8 +8,9 @@
 #include "app.h"
 #include "tvdb_api.h"
 #include "se_regex.h"
-#include "renamer.h"
+#include "scanner.h"
 #include "file_loading.h"
+#include "renamer.h"
 
 #define EPISODES_CACHE_FN   "episodes.json"
 #define SERIES_CACHE_FN     "series.json"
@@ -196,6 +197,14 @@ void SeriesFolder::update_state() {
 
     std::scoped_lock(m_state_mutex);
     m_state = new_state;
+}
+
+bool SeriesFolder::execute_actions() {
+    if (m_is_busy) return false;
+    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+
+    std::scoped_lock(m_state_mutex);
+    return rename_series_directory(m_path, m_state);
 }
 
 App::App()
