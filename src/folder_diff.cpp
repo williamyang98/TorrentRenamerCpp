@@ -55,6 +55,11 @@ void FolderDiff::OnIntentUpdate(FileIntent &intent, FileIntent::Action new_actio
     const auto rename_action = FileIntent::Action::RENAME;
     intent.action = new_action;
 
+    // auto fill the destination if renaming and no destination defined
+    if ((new_action == rename_action) && (intent.dest.size() == 0)) {
+        intent.dest = intent.src;
+    }
+
     // update upcoming counts
     if (old_action != rename_action && new_action == rename_action) {
         upcoming_counts[intent.dest]++;
