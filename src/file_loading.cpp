@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <array>
 
-#include <iostream>
 #include <exception>
 
 #include <rapidjson/reader.h>
@@ -15,11 +14,13 @@
 #include <rapidjson/stringbuffer.h>
 
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
 #include "file_loading.h"
 
 namespace app {
 
+// for all loading checks, refer to the schema file (schema.json) for structure of document
 SeriesInfo load_series_info(const rapidjson::Document &doc) {
     auto get_string_default = [](const rapidjson::Value &v) {
         return v.IsString() ? v.GetString() : "";
@@ -114,16 +115,16 @@ app_schema_t load_schema_from_file(const char *schema_fn) {
 bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {
     rapidjson::SchemaValidator validator(schema_doc);
     if (!doc.Accept(validator)) {
-        std::cerr << "Doc doesn't match schema" << std::endl;
+        spdlog::error("Doc doesn't match schema");
 
         rapidjson::StringBuffer sb;
         validator.GetInvalidDocumentPointer().StringifyUriFragment(sb);
-        std::cerr << "document pointer: " << sb.GetString() << std::endl;
-        std::cerr << "error-type: " << validator.GetInvalidSchemaKeyword() << std::endl;
+        spdlog::error(fmt::format("document pointer: {}", sb.GetString()));
+        spdlog::error(fmt::format("error-type: {}", validator.GetInvalidSchemaKeyword()));
         sb.Clear();
 
         validator.GetInvalidSchemaPointer().StringifyUriFragment(sb);
-        std::cerr << "schema pointer: " << sb.GetString() << std::endl;
+        spdlog::error(fmt::format("schema pointer: {}", sb.GetString()));
         sb.Clear();
 
         return false;
@@ -137,7 +138,7 @@ DocumentLoadResult load_document_from_file(const char *fn) {
 
     std::ifstream file(fn);
     if (!file.is_open()) {
-        std::cout << "Unable to open file: " << fn << std::endl; 
+        spdlog::warn(fmt::format("Unable to open file: {}", fn));
         res.code = DocumentLoadCode::FILE_NOT_FOUND;
         return res;
     }

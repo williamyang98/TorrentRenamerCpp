@@ -14,7 +14,10 @@
 
 #include <iostream>
 #include <filesystem>
+
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 #include "app.h"
 #include "gui_ext.h"
@@ -41,15 +44,16 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    auto root_path = fs::path(argv[1]);
-    return run(root_path);
+    auto logger = spdlog::basic_logger_mt("root", "logs.txt");
+    spdlog::set_default_logger(logger);
 
-    // try {
-    //     auto root_path = fs::path(argv[1]);
-    //     return run(root_path);
-    // } catch (std::exception &ex) {
-    //     std::cerr << "Exception in main: " << ex.what() << std::endl;
-    // }
+    try {
+        auto root_path = fs::path(argv[1]);
+        return run(root_path);
+    } catch (std::exception &ex) {
+        spdlog::critical(fmt::format("Exception in main: {}", ex.what()));
+    }
+    return 1;
 }
 
 int run(const fs::path &root) {
