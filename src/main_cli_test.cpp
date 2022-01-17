@@ -157,7 +157,7 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
     cfg.blacklist_extensions.push_back("nfo");
     cfg.blacklist_extensions.push_back("ext");
 
-    cfg.special_folders.push_back("Extras");
+    cfg.whitelist_folders.push_back("Extras");
 
     auto actions = app::scan_directory(subdir, tvdb_cache, cfg);
     actions.UpdateConflictTable();

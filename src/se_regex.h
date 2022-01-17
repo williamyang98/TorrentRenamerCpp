@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <array>
+#include <vector>
 
 namespace app
 {
@@ -13,6 +14,7 @@ struct SEMatch {
     int episode;
     std::string title;
     std::string ext;
+    std::vector<std::string> tags;
 };
 
 #define TITLE_PATTERN  "([a-zA-Z\\.\\s\\-]*)[^a-zA-Z\\.\\s\\-]*"
@@ -20,10 +22,10 @@ struct SEMatch {
 #define TOTAL_PATTERNS 4
 
 constexpr std::array<const char *, TOTAL_PATTERNS> SE_PATTERNS {
-    TITLE_PATTERN "[Ss](\\d+)\\s*[Ee](\\d+).*" EXT_PATTERN,
-    TITLE_PATTERN "[Ss]eason\\s*(\\d+)\\s*[Ee]pisode\\s*(\\d+).*" EXT_PATTERN,
-    TITLE_PATTERN "(\\d+)\\s*x\\s*(\\d+).*" EXT_PATTERN,
-    TITLE_PATTERN "[^\\w]+(\\d)(\\d\\d)[^\\w]+.*" EXT_PATTERN,
+    TITLE_PATTERN "[Ss](\\d+)\\s*[Ee](\\d+)(.*)" EXT_PATTERN,
+    TITLE_PATTERN "[Ss]eason\\s*(\\d+)\\s*[Ee]pisode\\s*(\\d+)(.*)" EXT_PATTERN,
+    TITLE_PATTERN "(\\d+)\\s*x\\s*(\\d+)(.*)" EXT_PATTERN,
+    TITLE_PATTERN "[^\\w]+(\\d)(\\d\\d)[^\\w]+(.*)" EXT_PATTERN,
 };
 
 const auto SE_REGEXES = 
