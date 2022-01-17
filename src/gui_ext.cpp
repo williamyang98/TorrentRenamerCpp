@@ -1,7 +1,9 @@
+#include <iostream>
 #include <string>
 #include <mutex>
 
 #include <imgui.h>
+#include <imgui_stdlib.h>
 #include <fmt/format.h>
 
 #include "gui_ext.h"
@@ -243,8 +245,9 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
     std::scoped_lock state_lock(folder.m_state_mutex);
     auto &state = folder.m_state;
     auto &counts = state.action_counts;
+    state.UpdateConflictTable();
 
-    bool show_tab_bar = ImGui::BeginTabBar("Status");
+    bool show_tab_bar = ImGui::BeginTabBar("##file intent tab group");
 
     auto tab_name = fmt::format("Completed {:d}###completed tab", counts.completes);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
@@ -365,7 +368,10 @@ void RenderFilesRename(SeriesState &state) {
             ImGui::TableSetColumnIndex(1);
             ImGui::TextWrapped(intent.src.c_str());
             ImGui::TableSetColumnIndex(2);
-            ImGui::TextWrapped(intent.dest.c_str());
+
+            if (ImGui::InputText("###dest path", &intent.dest)) {
+                state.is_conflict_table_dirty = true;
+            }
 
             const char *popup_id = "##intent action popup";
             ImGui::SameLine();
@@ -470,7 +476,13 @@ void RenderFilesConflict(SeriesState &state) {
                 ImGui::TextWrapped("%s", intent.src.c_str());
 
                 ImGui::TableSetColumnIndex(2);
-                ImGui::TextWrapped("%s", intent.dest.c_str());
+                if (intent.action == FileIntent::Action::RENAME) {
+                    if (ImGui::InputText("###dest path", &intent.dest)) {
+                        state.is_conflict_table_dirty = true;
+                    }
+                } else {
+                    ImGui::TextWrapped("%s", intent.dest.c_str());
+                }
 
                 auto popup_label = fmt::format("##action popup {}", src_id);
                 ImGui::SameLine();
