@@ -181,15 +181,17 @@ void SeriesFolder::update_state() {
 
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
     auto new_state = scan_directory(m_path, m_cache, m_cfg);
+    new_state.UpdateConflictTable();
 
-    // UNKNOWN, PENDING_DELETES, CONFLICTS, PENDING_RENAME, COMPLETED
-    if (new_state.deletes.size() > 0) {
+    auto &counts = new_state.action_counts;
+
+    if (counts.deletes > 0) {
         m_status = Status::PENDING_DELETES;
     } else if (new_state.conflicts.size() > 0) {
         m_status = Status::CONFLICTS;
-    } else if (new_state.pending.size() > 0) {
+    } else if (counts.renames > 0) {
         m_status = Status::PENDING_RENAME;
-    } else if (new_state.completed.size() > 0) {
+    } else if (counts.completes > 0) {
         m_status = Status::COMPLETED;
     } else {
         m_status = Status::EMPTY;

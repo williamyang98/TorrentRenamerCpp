@@ -33,14 +33,26 @@ static void glfw_error_callback(int error, const char* description)
 }
 
 namespace fs = std::filesystem;
+int run(const fs::path &root);
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     if (argc == 1) {
-        std::cout << "Enter directory to scan" << std::endl;
+        std::cout << "Usage main <root_dir>" << std::endl;
         return 1;
     }
 
+    auto root_path = fs::path(argv[1]);
+    return run(root_path);
+
+    // try {
+    //     auto root_path = fs::path(argv[1]);
+    //     return run(root_path);
+    // } catch (std::exception &ex) {
+    //     std::cerr << "Exception in main: " << ex.what() << std::endl;
+    // }
+}
+
+int run(const fs::path &root) {
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -106,7 +118,7 @@ int main(int argc, char **argv)
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     app::App main_app;
-    main_app.m_root = fs::path(argv[1]);
+    main_app.m_root = root;
     main_app.refresh_folders();
 
     // Main loop
@@ -149,4 +161,5 @@ int main(int argc, char **argv)
     glfwTerminate();
 
     return 0;
+
 }

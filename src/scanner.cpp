@@ -17,6 +17,114 @@ namespace app {
 
 namespace fs = std::filesystem;
 
+void SeriesState::UpdateActionCount(FileIntent::Action action, int delta) {
+    switch (action) {
+    case FileIntent::Action::COMPLETE:
+        action_counts.completes++; return;
+    case FileIntent::Action::RENAME:
+        action_counts.renames++; return;
+    case FileIntent::Action::DELETE:
+        action_counts.deletes++; return;
+    case FileIntent::Action::IGNORE:
+        action_counts.ignores++; return;
+    default:
+        return;
+    }
+}
+
+void SeriesState::AddIntent(FileIntent &intent) {
+    is_conflict_table_dirty = true;
+    intents[intent.src] = intent; 
+    if (intent.action == FileIntent::Action::RENAME) {
+        upcoming_counts[intent.dest]++;
+    }
+    UpdateActionCount(intent.action, +1);
+}
+
+void SeriesState::OnIntentUpdate(FileIntent &intent, FileIntent::Action new_action) {
+    if (intent.action == new_action) {
+        return;
+    }
+
+    UpdateActionCount(intent.action, -1);
+    UpdateActionCount(new_action, +1);
+
+    is_conflict_table_dirty = true;
+
+    const auto old_action = intent.action;
+    const auto rename_action = FileIntent::Action::RENAME;
+    intent.action = new_action;
+
+    // update upcoming counts
+    if (old_action != rename_action && new_action == rename_action) {
+        upcoming_counts[intent.dest]++;
+    } else if (old_action == rename_action && new_action != rename_action) {
+        upcoming_counts[intent.dest]--;
+    } 
+}
+
+void SeriesState::OnIntentUpdate(FileIntent &intent, bool new_is_active) {
+    // TODO: imgui checkbox fix required
+    // if (intent.is_active == new_is_active) {
+    //     return;
+    // }
+
+    intent.is_active = new_is_active;
+
+    if (intent.action != FileIntent::Action::RENAME) {
+        return;
+    }
+
+    is_conflict_table_dirty = true;
+
+    // update upcoming counts
+    if (new_is_active) {
+        upcoming_counts[intent.dest]++;
+    } else {
+        upcoming_counts[intent.dest]--;
+    } 
+}
+
+void SeriesState::UpdateConflictTable() {
+    if (!is_conflict_table_dirty) {
+        return;
+    }
+
+    // clear the conflicts table
+    conflicts.clear();
+
+    for (auto &[key, intent]: intents) {
+        // source conflicts with upcoming change
+        if (upcoming_counts[intent.src] > 0) {
+            intent.is_conflict = true;
+            conflicts[intent.src].push_back(key);
+            continue;
+        }
+
+        // a rename destination will conflict if it is active
+        bool might_conflict = (intent.action == FileIntent::Action::RENAME) && intent.is_active;
+        if (!might_conflict) {
+            intent.is_conflict = false;
+            continue;
+        }
+
+        // destination on rename conflicts with existing file or incoming change
+        // and it is also active
+        bool is_dst_conflict =
+            (upcoming_counts[intent.dest] > 1) ||
+            (intents.find(intent.dest) != intents.end());
+        
+        intent.is_conflict = is_dst_conflict;
+        
+        if (is_dst_conflict) {
+            conflicts[intent.dest].push_back(key);
+            continue;
+        }
+    }
+
+    is_conflict_table_dirty = false;
+}
+
 SeriesState scan_directory(
     const fs::path &root, 
     const TVDB_Cache &cache,
@@ -30,16 +138,13 @@ SeriesState scan_directory(
         return ss;
     }
 
-    std::vector<PendingFile> all_pending;
-    std::unordered_set<std::string> taken_filenames;
-    std::unordered_set<std::string> pending_filenames;
-
     // get required actions
     auto &dir = fs::recursive_directory_iterator(root);
     for (auto &e: dir) {
         if (!fs::is_regular_file(e)) {
             continue;
         }
+
 
         PROFILE_SCOPE("File processing");
 
@@ -53,6 +158,11 @@ SeriesState scan_directory(
         // for each file determine action to perform, given cache
         const auto ext = filename_path.extension().string();
 
+        FileIntent intent;
+        intent.src = old_rel_path_str;
+        intent.action = FileIntent::Action::IGNORE;
+        intent.is_active = false;
+        intent.is_conflict = false;
 
         // std::cout << std::endl << "* Processing " << old_rel_path << std::endl;
         // std::cout << "filename=" << filename << std::endl;
@@ -68,7 +178,9 @@ SeriesState scan_directory(
 
         if (is_invalid_ext) {
             // std::cout << FMAG("[D] ") << old_rel_path << std::endl;
-            ss.deletes.push_back({ old_rel_path_str, true });
+            intent.action = FileIntent::Action::DELETE;
+            intent.is_active = false;
+            ss.AddIntent(intent);
             continue;
         }
         PROFILE_MANUAL_END(blacklist);
@@ -84,8 +196,9 @@ SeriesState scan_directory(
         
         if (is_special_folder) {
             // std::cout << FCYN("[I] ") << old_rel_path << std::endl;
-            ss.ignores.push_back(old_rel_path_str);
-            taken_filenames.insert(old_rel_path_str);
+            intent.action = FileIntent::Action::IGNORE;
+            intent.is_active = false;
+            ss.AddIntent(intent);
             continue;
         }
         PROFILE_MANUAL_END(special_check);
@@ -97,8 +210,9 @@ SeriesState scan_directory(
         // ignore if cant rename
         if (!mr) {
             // std::cout << FCYN("[I] ") << old_rel_path << std::endl;
-            ss.ignores.push_back(old_rel_path_str);
-            taken_filenames.insert(old_rel_path_str);
+            intent.action = FileIntent::Action::IGNORE;
+            intent.is_active = false;
+            ss.AddIntent(intent);
             continue;
         }
 
@@ -146,38 +260,18 @@ SeriesState scan_directory(
 
         if (old_rel_path == new_rel_path) {
             // std::cout << FGRN("[C] ") << old_rel_path_str << std::endl;
-            ss.completed.push_back(old_rel_path_str);
-            taken_filenames.insert(old_rel_path_str);
+            intent.action = FileIntent::Action::COMPLETE;
+            intent.is_active = false;
+            ss.AddIntent(intent);
         } else {
             // std::cout << FYEL("[R] ") << old_rel_path_str << " ==> "  << new_rel_path_str << std::endl;
-            all_pending.push_back({ old_rel_path_str, new_rel_path_str, false });
-            pending_filenames.insert(new_rel_path_str);
+            intent.action = FileIntent::Action::RENAME;
+            intent.dest = new_rel_path_str;
+            intent.is_active = true;
+            ss.AddIntent(intent);
         }
         PROFILE_MANUAL_END(complete_check);
     }
-
-    PROFILE_MANUAL_BEGIN(conflict_check);
-
-    // detect and filter actions that produce conflicts
-    for (auto &pending: all_pending) {
-        // conflicts if there is already a file at the destination
-        // or if there is more than one file attempting to rename to that destination
-        const bool is_conflicting = 
-            taken_filenames.count(pending.dest) || 
-            pending_filenames.count(pending.dest) > 1;
-
-        if (is_conflicting) {
-            PROFILE_SCOPE("adding conflict");
-            pending.active = false;
-            ss.conflicts[pending.dest].push_back(pending);
-        } else {
-            PROFILE_SCOPE("adding pending");
-            pending.active = true;
-            ss.pending.push_back(pending);
-        }
-    }
-
-    PROFILE_MANUAL_END(conflict_check);
 
     return ss;
 }

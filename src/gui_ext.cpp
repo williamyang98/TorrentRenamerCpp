@@ -13,7 +13,7 @@ namespace app::gui
 static void RenderSeriesList(App &main_app);
 static void RenderSeriesFolder(App &main_app, SeriesFolder &folder);
 static void RenderEpisodes(App &main_app, SeriesFolder &folder);
-static void RenderConflicts(ConflictFiles &conflicts);
+static void RenderConflicts(SeriesState &state);
 static void RenderInfoPanel(App &main_app, SeriesFolder &folder);
 static void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder);
 
@@ -102,7 +102,7 @@ void RenderSeriesList(App &main_app) {
     }
 
     ImGui::Separator();
-    if (ImGui::BeginListBox("series_list_box", ImVec2(-1,-1))) {
+    if (ImGui::BeginListBox("##series_list_box", ImVec2(-1,-1))) {
 
         int folder_id = 0;
         for (auto &folder: main_app.m_folders) {
@@ -199,114 +199,181 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
     ImGui::EndDisabled();
 
     // render the state tree
-    auto &state = folder.m_state;
     std::scoped_lock state_lock(folder.m_state_mutex);
+    auto &state = folder.m_state;
+    auto &counts = state.action_counts;
 
-    if (ImGui::BeginTabBar("Status")) {
-        auto tab_name = fmt::format("Completed {:d}", state.completed.size());
-        if (ImGui::BeginTabItem(tab_name.c_str())) {
-            if (ImGui::BeginListBox("Completed", ImVec2(-1,-1))) {
-                for (const auto &e: state.completed) {
-                    ImGui::TextWrapped(e.c_str());
-                }
-                ImGui::EndListBox();
+    bool show_tab_bar = ImGui::BeginTabBar("Status");
+
+    auto tab_name = fmt::format("Completed {:d}###completed tab", counts.completes);
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        if (ImGui::BeginListBox("##Completed", ImVec2(-1,-1))) {
+            for (auto &[key, intent]: state.intents) {
+                if (intent.action != FileIntent::Action::COMPLETE) continue; 
+                ImGui::TextWrapped(intent.src.c_str());
             }
-
-            ImGui::EndTabItem();
+            ImGui::EndListBox();
         }
-
-        tab_name = fmt::format("Ignores {:d}", state.ignores.size());
-        if (ImGui::BeginTabItem(tab_name.c_str())) {
-            if (ImGui::BeginListBox("Ignore", ImVec2(-1,-1))) {
-                for (const auto &e: state.ignores) {
-                    ImGui::TextWrapped(e.c_str());
-                }
-                ImGui::EndListBox();
-            }
-
-            ImGui::EndTabItem();
-        }
-
-        tab_name = fmt::format("Pending {:d}", state.pending.size());
-        if (ImGui::BeginTabItem(tab_name.c_str())) {
-            ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
-            if (ImGui::BeginTable("Pending Table", 3, flags)) {
-                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
-                ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableHeadersRow();
-
-                for (auto &e: state.pending) {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::Checkbox("", &e.active);
-
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::TextWrapped(e.target.c_str());
-
-                    ImGui::TableSetColumnIndex(2);
-                    ImGui::TextWrapped(e.dest.c_str());
-                }
-
-                ImGui::EndTable();
-            }
-
-            ImGui::EndTabItem();
-        }
-
-        tab_name = fmt::format("Deletes {:d}", state.deletes.size());
-        if (ImGui::BeginTabItem(tab_name.c_str())) {
-            if (ImGui::BeginListBox("Deletes", ImVec2(-1,-1))) {
-                for (auto &e: state.deletes) {
-                    ImGui::Checkbox(e.filename.c_str(), &e.active);
-                }
-                ImGui::EndListBox();
-            }
-            ImGui::EndTabItem();
-        }
-
-        tab_name = fmt::format("Conflicts {:d}", state.conflicts.size());
-        if (ImGui::BeginTabItem(tab_name.c_str())) {
-            RenderConflicts(state.conflicts);
-            ImGui::EndTabItem();
-        }
-
-        ImGui::EndTabBar();
+        ImGui::EndTabItem();
     }
 
-}
+    tab_name = fmt::format("Ignores {:d}###ignore tab", counts.ignores);
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        if (ImGui::BeginListBox("##Ignore", ImVec2(-1,-1))) {
+            for (auto &[key, intent]: state.intents) {
+                if (intent.action != FileIntent::Action::IGNORE) continue; 
+                ImGui::TextWrapped(intent.src.c_str());
+                
+            }
+            ImGui::EndListBox();
+        }
+        ImGui::EndTabItem();
+    }
 
-void RenderConflicts(ConflictFiles &conflicts) {
-    ImGuiTableFlags flags = 
-        ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | 
-        ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings |
-        ImGuiTableFlags_SizingStretchProp;
-
-    for (auto &[dest, targets]: conflicts) {
-        auto tree_label = fmt::format("{} ({:d})", dest.c_str(), targets.size());
-        bool is_open = ImGui::CollapsingHeader(tree_label.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-        if (is_open && ImGui::BeginTable("Table", 3, flags)) {
-
+    tab_name = fmt::format("Pending {:d}###pending tab", counts.renames);
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
+        if (ImGui::BeginTable("Pending Table", 3, flags)) {
             ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableHeadersRow();
 
-            for (auto &e: targets) {
+            int row_id  = 0;
+            for (auto &[key, intent]: state.intents) {
+                if (intent.action != FileIntent::Action::RENAME) continue; 
+
+                ImGui::PushID(row_id++);
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
-                ImGui::Checkbox("", &e.active);
+                if (ImGui::Checkbox("##intent_checkbox", &intent.is_active)) {
+                    state.OnIntentUpdate(intent, intent.is_active);
+                }
 
                 ImGui::TableSetColumnIndex(1);
-                ImGui::TextWrapped(e.target.c_str());
+                ImGui::TextWrapped(intent.src.c_str());
 
                 ImGui::TableSetColumnIndex(2);
-                ImGui::TextWrapped(e.dest.c_str());
+                ImGui::TextWrapped(intent.dest.c_str());
+                ImGui::PopID();
             }
 
             ImGui::EndTable();
         }
+
+        ImGui::EndTabItem();
     }
+
+    tab_name = fmt::format("Deletes {:d}###delete tab", counts.deletes);
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        if (ImGui::Button("Select all")) {
+            for (auto &[key, intent]: state.intents) {
+                if (intent.action != FileIntent::Action::DELETE) continue; 
+                state.OnIntentUpdate(intent, true);
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear all")) {
+            for (auto &[key, intent]: state.intents) {
+                if (intent.action != FileIntent::Action::DELETE) continue; 
+                state.OnIntentUpdate(intent, false);
+            }
+        }
+        ImGui::Separator();
+        if (ImGui::BeginListBox("##Deletes", ImVec2(-1,-1))) {
+            for (auto &[key, intent]: state.intents) {
+                if (intent.action != FileIntent::Action::DELETE) continue; 
+                if (ImGui::Checkbox(intent.src.c_str(), &intent.is_active)) {
+                    state.OnIntentUpdate(intent, intent.is_active);
+                }
+            }
+            ImGui::EndListBox();
+        }
+        ImGui::EndTabItem();
+    }
+
+    tab_name = fmt::format("Conflicts {:d}###conflict tab", state.conflicts.size());
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        RenderConflicts(state);
+        ImGui::EndTabItem();
+    }
+
+    if (show_tab_bar) {
+        ImGui::EndTabBar();
+    }
+
+}
+
+void RenderConflicts(SeriesState &state) {
+    state.UpdateConflictTable();
+    auto &conflicts = state.conflicts;
+
+    ImGui::BeginChild("Conflict tab");
+
+    ImGuiTableFlags flags = 
+        ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | 
+        ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings |
+        ImGuiTableFlags_SizingStretchProp;
+
+    int src_id = 0;
+    for (auto &[dest, targets]: conflicts) {
+        auto tree_label = fmt::format("{} ({:d})", dest.c_str(), targets.size());
+
+        bool is_open = ImGui::CollapsingHeader(tree_label.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+        if (is_open && ImGui::BeginTable("##conflict table", 4, flags)) {
+
+            ImGui::TableSetupColumn("##active checkbox column", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("##actions", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            for (auto &key: targets) {
+                auto &intent = state.intents[key];
+                ImGui::PushID(src_id++);
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+
+                if (intent.action == FileIntent::Action::RENAME) {
+                    if (ImGui::Checkbox("##active_check", &intent.is_active)) {
+                        state.OnIntentUpdate(intent, intent.is_active);
+                    }
+                }
+
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextWrapped("%s", intent.src.c_str());
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::TextWrapped("%s", intent.dest.c_str());
+
+                auto popup_label = fmt::format("##action popup {}", src_id);
+
+                ImGui::TableSetColumnIndex(3);
+                if (ImGui::Button("...")) {
+                    ImGui::OpenPopup(popup_label.c_str());
+                }
+
+                if (ImGui::BeginPopup(popup_label.c_str())) // <-- use last item id as popup id
+                {
+                    if (ImGui::Button("Delete")) {
+                        state.OnIntentUpdate(intent, FileIntent::Action::DELETE);
+                        state.OnIntentUpdate(intent, false);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::EndPopup();
+                }
+
+                ImGui::PopID();
+            }
+
+            ImGui::EndTable();
+        }
+
+        ImGui::Spacing();
+    }
+
+    ImGui::EndChild();
 }
 
 static void RenderCacheInfo(App &main_app, SeriesFolder &folder);
@@ -371,7 +438,7 @@ void RenderErrors(App &main_app, SeriesFolder &folder) {
     auto &errors = folder.m_errors;
 
     ImGui::Text("Error List");
-    if (ImGui::BeginListBox("Error List", ImVec2(-1,-1))) {
+    if (ImGui::BeginListBox("##Error List", ImVec2(-1,-1))) {
         
         auto it = errors.begin();
         auto end = errors.end();
@@ -431,7 +498,7 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
             ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable |
             ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti;
 
-        if (ImGui::BeginTable("Search Results", 5, flags)) {
+        if (ImGui::BeginTable("##Search Results", 5, flags)) {
             ImGui::TableSetupColumn("Name",     ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("Date",     ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("ID",       ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthStretch);
@@ -457,6 +524,7 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
                     uint32_t id = r.id;
                     main_app.m_thread_pool.push([id, &folder, &main_app](int pid) {
                         folder.refresh_cache(id, main_app.m_token.c_str());
+                        folder.update_state();
                     });
                     ImGui::CloseCurrentPopup(); 
                 }
