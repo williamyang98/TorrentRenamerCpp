@@ -266,7 +266,7 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
 
     tab_name = fmt::format("Deletes {:d}###delete tab", counts.deletes);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
-        RenderFilesIgnore(state);
+        RenderFilesDelete(state);
         ImGui::EndTabItem();
     }
 
