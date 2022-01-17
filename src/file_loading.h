@@ -17,6 +17,7 @@ namespace app
 
 typedef std::unordered_map<std::string, rapidjson::SchemaDocument> app_schema_t;
 
+// stores info about series
 struct SeriesInfo {
     uint32_t id;
     std::string name;
@@ -24,6 +25,7 @@ struct SeriesInfo {
     std::string status;
 };
 
+// stores info about an episode 
 struct EpisodeInfo {
     uint32_t id;
     int season;
@@ -40,7 +42,7 @@ struct EpisodeInfo {
     }
 };
 
-// hash key for unordered map for episode lookup
+// key for unordered map for episode lookup
 struct EpisodeKey {
     const int season;
     const int episode;
@@ -54,6 +56,7 @@ struct EpisodeKey {
     }
 };
 
+// define our hash function here to pass to unordered_map
 struct EpisodeKeyHasher {
     std::size_t operator()(const app::EpisodeKey& k) const noexcept {
         return k.GetHash();
@@ -62,20 +65,24 @@ struct EpisodeKeyHasher {
 
 typedef std::unordered_map<EpisodeKey, EpisodeInfo, EpisodeKeyHasher> EpisodesMap;
 
+// a cache that stores combined series and episodes info
 struct TVDB_Cache {
     SeriesInfo series;
     EpisodesMap episodes;
 };
 
+// load data from json documents
 SeriesInfo load_series_info(const rapidjson::Document &doc);
 EpisodesMap load_series_episodes_info(const rapidjson::Document &doc);
 std::vector<SeriesInfo> load_search_info(const rapidjson::Document &doc);
 
+// load our validation schema from a file
 app_schema_t load_app_schema_from_buffer(const char *data);
 app_schema_t load_schema_from_file(const char *schema_fn);
+// use validation schema and log any errors 
 bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc);
 
-// document loading handling
+// reading and writing json documents
 enum DocumentLoadCode {
     OK, FILE_NOT_FOUND
 };

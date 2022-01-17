@@ -15,17 +15,17 @@ namespace app::gui
 {
 
 static void RenderSeriesList(App &main_app);
+
 static void RenderSeriesFolder(App &main_app, SeriesFolder &folder);
-
 static void RenderEpisodes(App &main_app, SeriesFolder &folder);
-
-static void RenderFilesComplete(SeriesState &state);
-static void RenderFilesIgnore(SeriesState &state);
-static void RenderFilesRename(SeriesState &state);
-static void RenderFilesDelete(SeriesState &state);
-static void RenderFilesConflict(SeriesState &state);
-
 static void RenderInfoPanel(App &main_app, SeriesFolder &folder);
+
+static void RenderFilesComplete(FolderDiff &state);
+static void RenderFilesIgnore(FolderDiff &state);
+static void RenderFilesRename(FolderDiff &state);
+static void RenderFilesDelete(FolderDiff &state);
+static void RenderFilesConflict(FolderDiff &state);
+
 static void RenderCacheInfo(App &main_app, SeriesFolder &folder);
 static void RenderErrors(App &main_app, SeriesFolder &folder);
 
@@ -81,7 +81,7 @@ void RenderSeriesList(App &main_app) {
     if (ImGui::Button("Scan contents of all folders")) {
         for (auto &folder: main_app.m_folders) {
             main_app.m_thread_pool.push([&folder](int pid) {
-                folder.update_state();
+                folder.update_state_from_cache();
             });
         }
     }
@@ -149,7 +149,7 @@ void RenderSeriesList(App &main_app) {
             if (selected_pressed) {
                 main_app.m_current_folder = &folder;
                 main_app.m_thread_pool.push([&folder](int pid) {
-                    folder.update_state();
+                    folder.update_state_from_cache();
                 });
             }
         }
@@ -185,12 +185,11 @@ std::array<FileActionStringPair, 4> FileActionToString = {{
     { FileIntent::Action::COMPLETE, "Complete" },
 }};
 
-static void RenderFileIntentChange(SeriesState &state, FileIntent &intent, const char *label) {
-    if (ImGui::BeginPopup(label)) // <-- use last item id as popup id
-    {
+static void RenderFileIntentChange(FolderDiff &state, FileIntent &intent, const char *label) {
+    if (ImGui::BeginPopup(label)) {
         for (auto &p: FileActionToString) {
             if ((intent.action != p.action) 
-                && ImGui::Button(p.str)) 
+                && ImGui::Selectable(p.str, false, 0)) 
             {
                 state.OnIntentUpdate(intent, p.action);
                 state.OnIntentUpdate(intent, false);
@@ -208,23 +207,23 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
 
     if (ImGui::Button("Scan for changes")) {
         main_app.m_thread_pool.push([&folder](int pid) {
-            folder.update_state();
+            folder.update_state_from_cache();
         });
     }
 
     ImGui::SameLine();
     if (ImGui::Button("Refresh from cache")) {
         main_app.m_thread_pool.push([&folder](int pid) {
-            folder.load_cache();
-            folder.update_state();
+            folder.load_cache_from_file();
+            folder.update_state_from_cache();
         });
     }
 
     ImGui::SameLine();
     if (ImGui::Button("Download and refresh from tvdb")) {
         main_app.m_thread_pool.push([&folder, &main_app](int pid) {
-            folder.refresh_cache(folder.m_cache.series.id, main_app.m_token.c_str());
-            folder.update_state();
+            folder.load_cache_from_tvdb(folder.m_cache.series.id, main_app.m_token.c_str());
+            folder.update_state_from_cache();
         });
     }
 
@@ -232,7 +231,7 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
     if (ImGui::Button("Execute changes")) {
         main_app.m_thread_pool.push([&folder, &main_app](int pid) {
             folder.execute_actions();
-            folder.update_state();
+            folder.update_state_from_cache();
         });
     }
 
@@ -285,7 +284,7 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
 
 }
 
-void RenderFilesComplete(SeriesState &state) {
+void RenderFilesComplete(FolderDiff &state) {
     ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
     if (ImGui::BeginTable("##complete table", 1, flags)) {
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
@@ -308,7 +307,7 @@ void RenderFilesComplete(SeriesState &state) {
     }
 }
 
-void RenderFilesIgnore(SeriesState &state) {
+void RenderFilesIgnore(FolderDiff &state) {
     ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
     if (ImGui::BeginTable("##ignore table", 1, flags)) {
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
@@ -331,7 +330,7 @@ void RenderFilesIgnore(SeriesState &state) {
     }
 }
 
-void RenderFilesRename(SeriesState &state) {
+void RenderFilesRename(FolderDiff &state) {
     if (ImGui::Button("Select all")) {
         for (auto &[key, intent]: state.intents) {
             if (intent.action != FileIntent::Action::RENAME) continue; 
@@ -387,7 +386,7 @@ void RenderFilesRename(SeriesState &state) {
     }
 }
 
-void RenderFilesDelete(SeriesState &state) {
+void RenderFilesDelete(FolderDiff &state) {
     if (ImGui::Button("Select all")) {
         for (auto &[key, intent]: state.intents) {
             if (intent.action != FileIntent::Action::DELETE) continue; 
@@ -436,7 +435,7 @@ void RenderFilesDelete(SeriesState &state) {
     }
 }
 
-void RenderFilesConflict(SeriesState &state) {
+void RenderFilesConflict(FolderDiff &state) {
     state.UpdateConflictTable();
     auto &conflicts = state.conflicts;
 
@@ -546,7 +545,7 @@ void RenderCacheInfo(App &main_app, SeriesFolder &folder) {
         ImGui::TableSetColumnIndex(0);
         ImGui::Text("Status"); 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextWrapped("%s", cache.series.air_date.c_str());
+        ImGui::TextWrapped("%s", cache.series.status.c_str());
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -613,7 +612,7 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
         ImGui::SameLine();
         if (ImGui::Button("Search")) {
             main_app.m_thread_pool.push([&folder, buf, &main_app](int pid) {
-                folder.search_series(buf, main_app.m_token.c_str());
+                folder.load_search_series_from_tvdb(buf, main_app.m_token.c_str());
             });
         }
         ImGui::Separator();
@@ -648,8 +647,8 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
                 if (ImGui::Button("Select")) {
                     uint32_t id = r.id;
                     main_app.m_thread_pool.push([id, &folder, &main_app](int pid) {
-                        folder.refresh_cache(id, main_app.m_token.c_str());
-                        folder.update_state();
+                        folder.load_cache_from_tvdb(id, main_app.m_token.c_str());
+                        folder.update_state_from_cache();
                     });
                     ImGui::CloseCurrentPopup(); 
                 }

@@ -1,4 +1,6 @@
 build/
-results.json/
-imgui.ini
 tests/
+
+results.json
+imgui.ini
+logs.txt

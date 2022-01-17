@@ -66,6 +66,9 @@ int main(int argc, char** argv) {
 }
 
 void assert_validation(bool is_valid, const char *message) {
+    if (is_valid) { 
+        return;
+    }
     std::cerr << "Failed validation (" << message << ")" << std::endl;
     exit(1);
 }
@@ -186,10 +189,10 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
         std::cout << FYEL("[D] ") << intent.src << std::endl;
     }
 
-    for (const auto &[dest, intents]: actions.conflicts) {
-        std::cout << FRED("[?] (" << intents.size() << ") ") << dest << std::endl;
-        for (auto &intent_ptr: intents) {
-            auto intent = *intent_ptr;
+    for (const auto &[dest, keys]: actions.conflicts) {
+        std::cout << FRED("[?] (" << keys.size() << ") ") << dest << std::endl;
+        for (auto &key: keys) {
+            auto intent = actions.intents[key];
             std::cout << "\t\t" << intent.src << std::endl;
         }
     }

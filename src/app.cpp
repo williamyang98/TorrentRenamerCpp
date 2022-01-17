@@ -5,6 +5,9 @@
 #include <mutex>
 #include <thread>
 
+#include <spdlog/spdlog.h>
+#include <fmt/core.h>
+
 #include "app.h"
 #include "tvdb_api.h"
 #include "se_regex.h"
@@ -42,18 +45,21 @@ SeriesFolder::SeriesFolder(
     app_schema_t &schema, 
     RenamingConfig &cfg,
     std::atomic<int> &busy_count) 
-: m_path(path), m_schema(schema), m_cfg(cfg), m_global_busy_count(busy_count) {
+: m_path(path), m_schema(schema), m_cfg(cfg), m_global_busy_count(busy_count) 
+{
     m_is_info_cached = false;
     m_is_busy = false;
     m_status = SeriesFolder::Status::UNKNOWN;
 }
 
+// thread safe push of error to list
 void SeriesFolder::push_error(std::string &str) {
     std::scoped_lock(m_errors_mutex);
     m_errors.push_back(str);
 }
 
-bool SeriesFolder::search_series(const char *name, const char *token) {
+// thread safe load series search results from tvdb with validation
+bool SeriesFolder::load_search_series_from_tvdb(const char *name, const char *token) {
     if (m_is_busy) return false;
 
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
@@ -77,7 +83,8 @@ bool SeriesFolder::search_series(const char *name, const char *token) {
     return true;
 }
 
-bool SeriesFolder::refresh_cache(uint32_t id, const char *token) {
+// thread safe load series and episodes data from tvdb with validation, and store as cache
+bool SeriesFolder::load_cache_from_tvdb(uint32_t id, const char *token) {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
@@ -133,7 +140,8 @@ bool SeriesFolder::refresh_cache(uint32_t id, const char *token) {
     return true;
 }
 
-bool SeriesFolder::load_cache() {
+// thread safe load the cache from local file (series.json, episodes.json)
+bool SeriesFolder::load_cache_from_file() {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
@@ -173,9 +181,10 @@ bool SeriesFolder::load_cache() {
     return true;
 }
 
-void SeriesFolder::update_state() {
+// update folder diff after cache has been loaded
+void SeriesFolder::update_state_from_cache() {
     if (m_is_busy) return;
-    if (!m_is_info_cached && !load_cache()) {
+    if (!m_is_info_cached && !load_cache_from_file()) {
         return;
     }
 
@@ -201,6 +210,7 @@ void SeriesFolder::update_state() {
     m_state = new_state;
 }
 
+// thread safe execute all actions in folder diff
 bool SeriesFolder::execute_actions() {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
@@ -215,6 +225,8 @@ App::App()
     m_current_folder = nullptr;
     m_global_busy_count = 0;
 
+    // TODO: load config for user defined control
+    // setup our config
     m_cfg.blacklist_extensions.push_back(".nfo");
     m_cfg.blacklist_extensions.push_back(".ext");
     m_cfg.special_folders.push_back("Extras");
@@ -224,17 +236,18 @@ App::App()
     authenticate();
 }
 
+// get a new token which can be used for a few hours
 void App::authenticate() {
     auto cred_res = load_document_from_file("credentials.json");
     if (cred_res.code != DocumentLoadCode::OK) {
-        std::cerr << "Failed to load credentials file" << std::endl;
+        spdlog::error("Failed to load credentials file");
         exit(1);
     }
 
     auto cred_doc = std::move(cred_res.doc);
 
     if (!validate_document(cred_doc, m_schema.at(std::string(SCHEME_CRED_KEY)))) {
-        std::cerr << "Credentials file is in the wrong format" << std::endl;
+        spdlog::error("Credentials file is in the wrong format");
         exit(1);
     }
 
@@ -245,7 +258,7 @@ void App::authenticate() {
             cred_doc["credentials"]["username"].GetString());
         
         if (!res) {
-            std::cerr << "Failed to login" << std::endl;
+            spdlog::error("Failed to login");
             exit(1);
         }
 
@@ -253,6 +266,7 @@ void App::authenticate() {
     }
 }
 
+// create folder objects for each folder in the root directory
 void App::refresh_folders() {
     if (m_global_busy_count > 0) {
         return;

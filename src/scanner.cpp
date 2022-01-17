@@ -1,10 +1,7 @@
 #include <vector>
 #include <filesystem>
-#include <map>
 #include <string>
 #include <fmt/core.h>
-#include <chrono>
-#include <unordered_set>
 
 #include "Instrumentor.h"
 #include "console_colours.h"
@@ -17,128 +14,20 @@ namespace app {
 
 namespace fs = std::filesystem;
 
-void SeriesState::UpdateActionCount(FileIntent::Action action, int delta) {
-    switch (action) {
-    case FileIntent::Action::COMPLETE:
-        action_counts.completes += delta; return;
-    case FileIntent::Action::RENAME:
-        action_counts.renames += delta; return;
-    case FileIntent::Action::DELETE:
-        action_counts.deletes += delta; return;
-    case FileIntent::Action::IGNORE:
-        action_counts.ignores += delta; return;
-    default:
-        return;
-    }
-}
-
-void SeriesState::AddIntent(FileIntent &intent) {
-    is_conflict_table_dirty = true;
-    intents[intent.src] = intent; 
-    if (intent.action == FileIntent::Action::RENAME) {
-        upcoming_counts[intent.dest]++;
-    }
-    UpdateActionCount(intent.action, +1);
-}
-
-void SeriesState::OnIntentUpdate(FileIntent &intent, FileIntent::Action new_action) {
-    if (intent.action == new_action) {
-        return;
-    }
-
-    UpdateActionCount(intent.action, -1);
-    UpdateActionCount(new_action, +1);
-
-    is_conflict_table_dirty = true;
-
-    const auto old_action = intent.action;
-    const auto rename_action = FileIntent::Action::RENAME;
-    intent.action = new_action;
-
-    // update upcoming counts
-    if (old_action != rename_action && new_action == rename_action) {
-        upcoming_counts[intent.dest]++;
-    } else if (old_action == rename_action && new_action != rename_action) {
-        upcoming_counts[intent.dest]--;
-    } 
-}
-
-void SeriesState::OnIntentUpdate(FileIntent &intent, bool new_is_active) {
-    // TODO: imgui checkbox fix required
-    // if (intent.is_active == new_is_active) {
-    //     return;
-    // }
-
-    intent.is_active = new_is_active;
-
-    if (intent.action != FileIntent::Action::RENAME) {
-        return;
-    }
-
-    is_conflict_table_dirty = true;
-
-    // update upcoming counts
-    if (new_is_active) {
-        upcoming_counts[intent.dest]++;
-    } else {
-        upcoming_counts[intent.dest]--;
-    } 
-}
-
-void SeriesState::UpdateConflictTable() {
-    if (!is_conflict_table_dirty) {
-        return;
-    }
-
-    // clear the conflicts table
-    conflicts.clear();
-
-    for (auto &[key, intent]: intents) {
-        // source conflicts with upcoming change
-        if (upcoming_counts[intent.src] > 0) {
-            intent.is_conflict = true;
-            conflicts[intent.src].push_back(key);
-            continue;
-        }
-
-        // a rename destination will conflict if it is active
-        bool might_conflict = (intent.action == FileIntent::Action::RENAME) && intent.is_active;
-        if (!might_conflict) {
-            intent.is_conflict = false;
-            continue;
-        }
-
-        // destination on rename conflicts with existing file or incoming change
-        // and it is also active
-        bool is_dst_conflict =
-            (upcoming_counts[intent.dest] > 1) ||
-            (intents.find(intent.dest) != intents.end());
-        
-        intent.is_conflict = is_dst_conflict;
-        
-        if (is_dst_conflict) {
-            conflicts[intent.dest].push_back(key);
-            continue;
-        }
-    }
-
-    is_conflict_table_dirty = false;
-}
-
-SeriesState scan_directory(
+FolderDiff scan_directory(
     const fs::path &root, 
     const TVDB_Cache &cache,
     const RenamingConfig &cfg) 
 {
     PROFILE_FUNC();
 
-    SeriesState ss;
+    FolderDiff ss;
 
     if (!fs::is_directory(root)) {
         return ss;
     }
 
-    // get required actions
+    // get required actions into folder diff
     auto &dir = fs::recursive_directory_iterator(root);
     for (auto &e: dir) {
         if (!fs::is_regular_file(e)) {
@@ -163,9 +52,6 @@ SeriesState scan_directory(
         intent.action = FileIntent::Action::IGNORE;
         intent.is_active = false;
         intent.is_conflict = false;
-
-        // std::cout << std::endl << "* Processing " << old_rel_path << std::endl;
-        // std::cout << "filename=" << filename << std::endl;
 
         // delete if blacklisted extension
         PROFILE_MANUAL_BEGIN(blacklist);

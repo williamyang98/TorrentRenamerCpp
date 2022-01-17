@@ -1,5 +1,4 @@
 #include <cpr/cpr.h>
-#include <iostream>
 #include <fstream>
 #include <string>
 
@@ -12,6 +11,9 @@
 #include <vector>
 #include <optional>
 
+#include <fmt/core.h>
+#include <spdlog/spdlog.h>
+
 #include "tvdb_api.h"
 
 namespace tvdb_api 
@@ -19,8 +21,6 @@ namespace tvdb_api
 
 // #define BASE_URL "https://api.thetvdb.com/"
 #define BASE_URL "http://api.thetvdb.com/"
-
-void print_response(cpr::Response &r);
 
 cpr::Header create_token_header(const char *token) {
     return cpr::Header{{"Authorization", "Bearer " + std::string(token)}};
@@ -59,7 +59,6 @@ bool refresh_token(const char *token) {
         create_token_header(token)
     );
 
-    print_response(r);
     return (r.status_code == 200);
 }
 
@@ -140,7 +139,7 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     for (int i = next_page; i <= last_page; i++) {
         auto r0 = get_page(i);
         if (r0.status_code != 200) {
-            std::cerr << "Request failed in middle of page loading" << std::endl;
+            spdlog::critical("Request failed in middle of page loading");
             exit(1);
         }
 
@@ -150,14 +149,6 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     }
     
     return combined_doc;
-}
-
-void print_response(cpr::Response &r) {
-    std::cout << "status_code: " << r.status_code << std::endl;
-    // for (auto &e: r.header) {
-    //     std::cout << "header[" << e.first << "]: " << e.second << std::endl;
-    // }
-    std::cout << "text: " << r.text.c_str() << std::endl;
 }
 
 };

@@ -1,5 +1,7 @@
 #include <filesystem>
-#include <iostream>
+
+#include <spdlog/spdlog.h>
+#include <fmt/core.h>
 
 #include "renamer.h"
 
@@ -8,7 +10,7 @@ namespace app
 
 namespace fs = std::filesystem;
 
-bool rename_series_directory(const fs::path &root, SeriesState &state) {
+bool rename_series_directory(const fs::path &root, FolderDiff &state) {
     // TODO: Add checking and error handling for invalid states
     bool all_success = true;
 
@@ -29,8 +31,7 @@ bool rename_series_directory(const fs::path &root, SeriesState &state) {
                 fs::remove(src_path);
             } catch (fs::filesystem_error &ex) {
                 all_success = false;
-                std::cerr << "Failed to remove file (" << src_path << "): " <<
-                ex.what() << std::endl;
+                spdlog::warn(fmt::format("Failed to remove file ({}): {}", src_path.string(), ex.what()));
             }
             continue;
         }
@@ -43,9 +44,9 @@ bool rename_series_directory(const fs::path &root, SeriesState &state) {
                 fs::rename(src_path, dest_path);
             } catch (fs::filesystem_error &ex) {
                 all_success = false;
-                std::cerr << 
-                    "Failed to rename pending file (" << src_path <<") to" << 
-                    "(" << dest_path << "): " << ex.what() << std::endl;
+                spdlog::warn(fmt::format(
+                    "Failed to rename pending file ({}) to ({}): {}", 
+                    src_path.string(), dest_path.string(), ex.what()));
             } 
             continue;
         }
