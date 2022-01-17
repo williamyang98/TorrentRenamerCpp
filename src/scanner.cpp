@@ -20,13 +20,13 @@ namespace fs = std::filesystem;
 void SeriesState::UpdateActionCount(FileIntent::Action action, int delta) {
     switch (action) {
     case FileIntent::Action::COMPLETE:
-        action_counts.completes++; return;
+        action_counts.completes += delta; return;
     case FileIntent::Action::RENAME:
-        action_counts.renames++; return;
+        action_counts.renames += delta; return;
     case FileIntent::Action::DELETE:
-        action_counts.deletes++; return;
+        action_counts.deletes += delta; return;
     case FileIntent::Action::IGNORE:
-        action_counts.ignores++; return;
+        action_counts.ignores += delta; return;
     default:
         return;
     }
