@@ -198,7 +198,7 @@ void SeriesFolder::update_state_from_cache() {
         m_status = Status::PENDING_DELETES;
     } else if (new_state.conflicts.size() > 0) {
         m_status = Status::CONFLICTS;
-    } else if (counts.renames > 0) {
+    } else if ((counts.renames > 0) || (counts.ignores > 0)) {
         m_status = Status::PENDING_RENAME;
     } else if (counts.completes > 0) {
         m_status = Status::COMPLETED;
