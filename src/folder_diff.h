@@ -18,6 +18,7 @@ struct FileIntent {
         COMPLETE    = 1<<1,
         IGNORE      = 1<<2,
         DELETE      = 1<<3,
+        WHITELIST   = 1<<4,
     };
 
     std::string src;
@@ -44,6 +45,7 @@ public:
         int renames = 0; 
         int ignores = 0;
         int completes = 0;
+        int whitelists = 0;
     };
 public:
     FileTable intents;

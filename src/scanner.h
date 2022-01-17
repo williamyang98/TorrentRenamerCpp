@@ -16,7 +16,8 @@ namespace app
 // config for renaming
 struct RenamingConfig {
     std::vector<std::string> blacklist_extensions;
-    std::vector<std::string> special_folders;
+    std::vector<std::string> whitelist_folders;
+    std::vector<std::string> whitelist_files;
 };
 
 // produce an initial folder diff given the config 

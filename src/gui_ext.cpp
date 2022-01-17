@@ -25,6 +25,7 @@ static void RenderFilesIgnore(FolderDiff &state);
 static void RenderFilesRename(FolderDiff &state);
 static void RenderFilesDelete(FolderDiff &state);
 static void RenderFilesConflict(FolderDiff &state);
+static void RenderFilesWhitelist(FolderDiff &state);
 
 static void RenderCacheInfo(App &main_app, SeriesFolder &folder);
 static void RenderErrors(App &main_app, SeriesFolder &folder);
@@ -178,11 +179,12 @@ struct FileActionStringPair {
     const char *str;
 };
 
-std::array<FileActionStringPair, 4> FileActionToString = {{
+std::array<FileActionStringPair, 5> FileActionToString = {{
     { FileIntent::Action::DELETE, "Delete" },
     { FileIntent::Action::IGNORE, "Ignore" },
     { FileIntent::Action::RENAME, "Rename" },
     { FileIntent::Action::COMPLETE, "Complete" },
+    { FileIntent::Action::WHITELIST, "Whitelist" },
 }};
 
 static void RenderFileIntentChange(FolderDiff &state, FileIntent &intent, const char *label) {
@@ -254,21 +256,9 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
         ImGui::EndTabItem();
     }
 
-    tab_name = fmt::format("Ignores {:d}###ignore tab", counts.ignores);
-    if (ImGui::BeginTabItem(tab_name.c_str())) {
-        RenderFilesIgnore(state);
-        ImGui::EndTabItem();
-    }
-
     tab_name = fmt::format("Pending {:d}###pending tab", counts.renames);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
         RenderFilesRename(state);
-        ImGui::EndTabItem();
-    }
-
-    tab_name = fmt::format("Deletes {:d}###delete tab", counts.deletes);
-    if (ImGui::BeginTabItem(tab_name.c_str())) {
-        RenderFilesDelete(state);
         ImGui::EndTabItem();
     }
 
@@ -278,21 +268,40 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
         ImGui::EndTabItem();
     }
 
+    tab_name = fmt::format("Deletes {:d}###delete tab", counts.deletes);
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        RenderFilesDelete(state);
+        ImGui::EndTabItem();
+    }
+
+    tab_name = fmt::format("Ignores {:d}###ignore tab", counts.ignores);
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        RenderFilesIgnore(state);
+        ImGui::EndTabItem();
+    }
+
+    tab_name = fmt::format("Whitelists {:d}###whitelsit tab", counts.whitelists);
+    if (ImGui::BeginTabItem(tab_name.c_str())) {
+        RenderFilesWhitelist(state);
+        ImGui::EndTabItem();
+    }
+
     if (show_tab_bar) {
         ImGui::EndTabBar();
     }
 
 }
 
-void RenderFilesComplete(FolderDiff &state) {
+static void RenderEpisodesGenericList(FolderDiff &state, const char *table_id, FileIntent::Action action) {
     ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
-    if (ImGui::BeginTable("##complete table", 1, flags)) {
+    if (ImGui::BeginTable(table_id, 1, flags)) {
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
         int i = 0;
         for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::COMPLETE) continue; 
+            if (intent.action != action) continue; 
+
             ImGui::TableNextRow();
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
@@ -307,27 +316,16 @@ void RenderFilesComplete(FolderDiff &state) {
     }
 }
 
-void RenderFilesIgnore(FolderDiff &state) {
-    ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
-    if (ImGui::BeginTable("##ignore table", 1, flags)) {
-        ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableHeadersRow();
+void RenderFilesComplete(FolderDiff &state) {
+    RenderEpisodesGenericList(state, "##completed table", FileIntent::Action::COMPLETE);
+}
 
-        int i = 0;
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::IGNORE) continue; 
-            ImGui::TableNextRow();
-            ImGui::PushID(i++);
-            ImGui::TableSetColumnIndex(0);
-            const char *popup_key = "##intent action popup";
-            if (ImGui::Selectable(intent.src.c_str())) {
-                ImGui::OpenPopup(popup_key);
-            }
-            RenderFileIntentChange(state, intent, popup_key);
-            ImGui::PopID();
-        }
-        ImGui::EndTable();
-    }
+void RenderFilesIgnore(FolderDiff &state) {
+    RenderEpisodesGenericList(state, "##ignore table", FileIntent::Action::IGNORE);
+}
+
+void RenderFilesWhitelist(FolderDiff &state) {
+    RenderEpisodesGenericList(state, "##whitelist table", FileIntent::Action::WHITELIST);
 }
 
 void RenderFilesRename(FolderDiff &state) {

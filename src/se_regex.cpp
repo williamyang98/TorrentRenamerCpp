@@ -8,6 +8,21 @@
 
 namespace app {
 
+const std::regex TAG_REGEX("(\\[[a-zA-Z0-9]{2,}\\])");
+
+static std::vector<std::string> find_tags(std::string &str_in) {
+    std::vector<std::string> tags;
+    std::smatch res;
+
+    std::string str_proc = str_in;
+    while (std::regex_search(str_proc, res, TAG_REGEX)) {
+        tags.push_back(res[0]);
+        str_proc = res.suffix();
+    }
+
+    return tags;
+}
+
 std::optional<SEMatch> find_se_match(const char *fn, const std::vector<std::regex>& se_regexes) {
     PROFILE_FUNC();
 
@@ -28,7 +43,9 @@ std::optional<SEMatch> find_se_match(const char *fn, const std::vector<std::rege
             se.title = mr[1].str();
             se.season = std::stoi(mr[2].str());
             se.episode = std::stoi(mr[3].str());
-            se.ext = mr[4].str();
+            se.ext = mr[5].str();
+            se.tags = find_tags(mr[4].str());
+
             return se;
         }
     }

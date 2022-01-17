@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <string>
 #include <fmt/core.h>
+#include <sstream>
 
 #include "Instrumentor.h"
 #include "console_colours.h"
@@ -13,6 +14,28 @@
 namespace app {
 
 namespace fs = std::filesystem;
+
+// create filename from given parameters
+std::string create_filename(
+    const std::string &title, int season, int episode, 
+    const std::string &name, const std::string &ext, 
+    const std::vector<std::string> &tags) 
+{
+    std::stringstream ss;
+    ss << fmt::format("{}-S{:02d}E{:02d}", title, season, episode);
+    if (name.size() > 0) {
+        ss << "-" << name;
+    }
+    if (tags.size() > 0) {
+        ss << ".";
+    }
+    for (auto &tag: tags) {
+        ss << tag;
+    }
+    ss << "." << ext;
+
+    return ss.str();
+}
 
 FolderDiff scan_directory(
     const fs::path &root, 
@@ -71,23 +94,30 @@ FolderDiff scan_directory(
         }
         PROFILE_MANUAL_END(blacklist);
 
-        // ignore if in a special folder
-        PROFILE_MANUAL_BEGIN(special_check);
-        bool is_special_folder = std::find_if(
-            cfg.special_folders.begin(),
-            cfg.special_folders.end(),
+        // ignore if in a special folder or whitelisted filename
+        PROFILE_MANUAL_BEGIN(whitelist_check);
+        bool is_whitelisted = std::find_if(
+            cfg.whitelist_folders.begin(),
+            cfg.whitelist_folders.end(),
             [&old_rel_path_str] (const std::string &folder) {
                 return old_rel_path_str.compare(0, folder.size(), folder) == 0;
-            }) != cfg.special_folders.end();
+            }) != cfg.whitelist_folders.end();
+
+        is_whitelisted = is_whitelisted || std::find_if(
+            cfg.whitelist_files.begin(),
+            cfg.whitelist_files.end(),
+            [&filename] (const std::string &other) {
+                return filename.compare(0, other.size(), other) == 0;
+            }) != cfg.whitelist_files.end();
         
-        if (is_special_folder) {
+        if (is_whitelisted) {
             // std::cout << FCYN("[I] ") << old_rel_path << std::endl;
-            intent.action = FileIntent::Action::IGNORE;
+            intent.action = FileIntent::Action::WHITELIST;
             intent.is_active = false;
             ss.AddIntent(intent);
             continue;
         }
-        PROFILE_MANUAL_END(special_check);
+        PROFILE_MANUAL_END(whitelist_check);
 
         // try to rename
         PROFILE_MANUAL_BEGIN(rename_block);
@@ -117,24 +147,25 @@ FolderDiff scan_directory(
         // if unable to retrieve tvdb data, give generic rename
         if (ep_table.find(key) == ep_table.end()) {
             PROFILE_SCOPE("pending_block::no_metadata");
-            dest_fn = fmt::format(
-                "{}-S{:02d}E{:02d}.{}", 
+            dest_fn = create_filename(
                 app::clean_se_title(cache.series.name),
                 match.season,
                 match.episode,
-                match.ext
+                "",
+                match.ext,
+                match.tags
             );
         // rename according to the metadata
         } else {
             PROFILE_SCOPE("pending_block::metadata");
             auto &ep = ep_table.at(key);
-            dest_fn = fmt::format(
-                "{}-S{:02d}E{:02d}-{}.{}", 
+            dest_fn = create_filename(
                 app::clean_se_title(cache.series.name),
                 match.season,
                 match.episode,
                 app::clean_se_name(ep.name),
-                match.ext
+                match.ext,
+                match.tags
             );
         }
         PROFILE_MANUAL_END(pending_block);

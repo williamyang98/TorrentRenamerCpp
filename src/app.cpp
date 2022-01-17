@@ -229,7 +229,10 @@ App::App()
     // setup our config
     m_cfg.blacklist_extensions.push_back(".nfo");
     m_cfg.blacklist_extensions.push_back(".ext");
-    m_cfg.special_folders.push_back("Extras");
+
+    m_cfg.whitelist_folders.push_back("Extras");
+    m_cfg.whitelist_files.push_back("episodes.json");
+    m_cfg.whitelist_files.push_back("series.json");
 
     m_schema = load_schema_from_file("schema.json");
 

@@ -21,6 +21,8 @@ void FolderDiff::UpdateActionCount(FileIntent::Action action, int delta) {
         action_counts.deletes += delta; return;
     case FileIntent::Action::IGNORE:
         action_counts.ignores += delta; return;
+    case FileIntent::Action::WHITELIST:
+        action_counts.whitelists += delta; return;
     default:
         return;
     }
