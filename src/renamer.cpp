@@ -12,57 +12,44 @@ bool rename_series_directory(const fs::path &root, SeriesState &state) {
     // TODO: Add checking and error handling for invalid states
     bool all_success = true;
 
-    for (auto &e: state.pending) {
-        if (!e.active) {
+    for (auto &[key, intent]: state.intents) {
+        if (!intent.is_active) {
             continue;
         }
 
-        auto src_path = root / e.target;
-        auto dest_path = root / e.dest;
-
-        try {
-            fs::rename(src_path, dest_path);
-        } catch (fs::filesystem_error &ex) {
-            all_success = false;
-            std::cerr << 
-                "Failed to rename pending file (" << src_path <<") to" << 
-                "(" << dest_path << "): " << ex.what() << std::endl;
-        } 
-    }
-
-    for (auto &e: state.deletes) {
-        if (!e.active) {
+        // if intent is conflicting, stop it from overriding files
+        if (intent.is_conflict) {
             continue;
         }
 
-        auto src_path = root / e.filename;
+        auto src_path = root / intent.src;
 
-        try {
-            fs::remove(src_path);
-        } catch (fs::filesystem_error &ex) {
-            all_success = false;
-            std::cerr << "Failed to remove file (" << src_path << "): " <<
-            ex.what() << std::endl;
-        }
-    }
-
-    for (auto &[conflict_dest, targets]: state.conflicts) {
-        for (auto &e: targets) {
-            if (!e.active) {
-                continue;
-            }
-
-            auto src_path = root / e.target;
-            auto dest_path = root / e.dest;
+        if (intent.action == FileIntent::Action::DELETE) {
             try {
+                fs::remove(src_path);
+            } catch (fs::filesystem_error &ex) {
+                all_success = false;
+                std::cerr << "Failed to remove file (" << src_path << "): " <<
+                ex.what() << std::endl;
+            }
+            continue;
+        }
+
+        if (intent.action == FileIntent::Action::RENAME) {
+            auto dest_path = root / intent.dest;
+            try {
+                auto dest_path_folder = fs::path(dest_path).remove_filename();
+                fs::create_directories(dest_path_folder);
                 fs::rename(src_path, dest_path);
             } catch (fs::filesystem_error &ex) {
                 all_success = false;
                 std::cerr << 
-                    "Failed to rename conflicting file (" << src_path <<") to" << 
-                    "(" << dest_path << ") conflicting with (" << (root / conflict_dest) << "): " << ex.what() << std::endl;
+                    "Failed to rename pending file (" << src_path <<") to" << 
+                    "(" << dest_path << "): " << ex.what() << std::endl;
             } 
+            continue;
         }
+
     }
 
     return all_success;

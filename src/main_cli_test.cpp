@@ -157,35 +157,40 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
     cfg.special_folders.push_back("Extras");
 
     auto actions = app::scan_directory(subdir, tvdb_cache, cfg);
+    actions.UpdateConflictTable();
+    auto &counts = actions.action_counts;
     
-    std::cout << "completed=" << actions.completed.size() << std::endl;
-    std::cout << "ignores=" << actions.ignores.size() << std::endl;
-    std::cout << "deletes=" << actions.deletes.size() << std::endl;
+    std::cout << "completed=" << counts.completes << std::endl;
+    std::cout << "ignores=" << counts.ignores << std::endl;
+    std::cout << "deletes=" << counts.deletes << std::endl;
     std::cout << "conflicts=" << actions.conflicts.size() << std::endl;
-    std::cout << "pending=" << actions.pending.size() << std::endl;
+    std::cout << "pending=" << counts.renames << std::endl;
 
-    for (const auto &e: actions.completed) {
-        std::cout << FGRN("[C] ") << e << std::endl;
+    for (const auto &[key, intent]: actions.intents) {
+        if (intent.action != app::FileIntent::Action::COMPLETE) continue;
+        std::cout << FGRN("[C] ") << intent.src << std::endl;
     }
 
-    for (const auto &e: actions.ignores) {
-        std::cout << FMAG("[I] ") << e << std::endl;
+    for (const auto &[key, intent]: actions.intents) {
+        if (intent.action != app::FileIntent::Action::IGNORE) continue;
+        std::cout << FMAG("[I] ") << intent.src << std::endl;
     }
 
-    for (const auto &e: actions.pending) {
-        std::cout << FCYN("[P] ") << e.target << " ==> " << e.dest << std::endl;
+    for (const auto &[key, intent]: actions.intents) {
+        if (intent.action != app::FileIntent::Action::RENAME) continue;
+        std::cout << FCYN("[P] ") << intent.src << " ==> " << intent.dest << std::endl;
     }
 
-    for (const auto &e: actions.deletes) {
-        std::cout << FYEL("[D] ") << e.filename << std::endl;
+    for (const auto &[key, intent]: actions.intents) {
+        if (intent.action != app::FileIntent::Action::DELETE) continue;
+        std::cout << FYEL("[D] ") << intent.src << std::endl;
     }
 
-    for (const auto &e: actions.conflicts) {
-        auto &dest = e.first;
-        auto &targets = e.second;
-        std::cout << FRED("[?] (" << targets.size() << ") ") << dest << std::endl;
-        for (auto &t: targets) {
-            std::cout << "\t\t" << t.target << std::endl;
+    for (const auto &[dest, intents]: actions.conflicts) {
+        std::cout << FRED("[?] (" << intents.size() << ") ") << dest << std::endl;
+        for (auto &intent_ptr: intents) {
+            auto intent = *intent_ptr;
+            std::cout << "\t\t" << intent.src << std::endl;
         }
     }
 }
