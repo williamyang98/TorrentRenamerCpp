@@ -38,6 +38,9 @@ static void glfw_error_callback(int error, const char* description)
 namespace fs = std::filesystem;
 int run(const fs::path &root);
 
+// tell compiler to not link as /SUBSYSTEM:console which adds an extra command prompt
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+
 int main(int argc, char **argv) {
     if (argc == 1) {
         std::cout << "Usage main <root_dir>" << std::endl;
