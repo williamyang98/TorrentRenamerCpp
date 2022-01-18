@@ -2,7 +2,7 @@
     "credentials_file": "credentials.json",
     "schema_file": "schema.json",
     "whitelist_folders": [
-        "Extras/"
+        "Extras"
     ],
     "whitelist_filenames": [
         "series.json",
@@ -12,6 +12,6 @@
         ".nfo", ".exe"
     ],
     "whitelist_tags": [
-        "DC", "EXTENDED", "ALT", "ALTERNATE"
+        "DC", "EXTENDED", "ALT", "ALTERNATE", "UNCUT"
     ]
 }

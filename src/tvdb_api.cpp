@@ -116,7 +116,7 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     combined_doc.SetArray();
 
     auto add_episodes = [&combined_doc](rapidjson::Document &doc) {
-        auto &episodes_data = doc["data"].GetArray();
+        auto episodes_data = doc["data"].GetArray();
         for (auto &ep_data: episodes_data) {
             rapidjson::Value ep_copy;
             ep_copy.CopyFrom(ep_data, combined_doc.GetAllocator()) ;

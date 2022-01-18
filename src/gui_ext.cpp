@@ -370,9 +370,11 @@ void RenderFilesRename(FolderDiff &state) {
             ImGui::TextWrapped(intent.src.c_str());
             ImGui::TableSetColumnIndex(2);
 
+            ImGui::PushItemWidth(-1.0f);
             if (ImGui::InputText("###dest path", &intent.dest)) {
                 state.is_conflict_table_dirty = true;
             }
+            ImGui::PopItemWidth();
 
             const char *popup_id = "##intent action popup";
             ImGui::SameLine();
@@ -481,9 +483,11 @@ void RenderFilesConflict(FolderDiff &state) {
 
                 ImGui::TableSetColumnIndex(2);
                 if (intent.action == FileIntent::Action::RENAME) {
+                    ImGui::PushItemWidth(-1.0f);
                     if (ImGui::InputText("###dest path", &intent.dest)) {
                         state.is_conflict_table_dirty = true;
                     }
+                    ImGui::PopItemWidth();
                 } else {
                     ImGui::TextWrapped("%s", intent.dest.c_str());
                 }
@@ -612,8 +616,10 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
     bool is_modal_open = true;
 
     if (ImGui::BeginPopupModal(modal_title, &is_modal_open, 0)) {
-
+        ImGui::PushItemWidth(-1.0f);
         ImGui::InputText("##search_text", search_string, IM_ARRAYSIZE(search_string));
+        ImGui::PopItemWidth();
+
         ImGui::SameLine();
         if (ImGui::Button("Search")) {
             main_app.queue_async_call([&folder, buf, &main_app](int pid) {
@@ -685,9 +691,9 @@ void RenderAppErrors(App &main_app) {
         ImGui::Text("The application has encounted an error");
         ImGui::Text("Please restart the application");
         ImGui::Separator();
-        if (ImGui::BeginListBox("##app error list")) {
+        if (ImGui::BeginListBox("##app error list", ImVec2(-1,-1))) {
             for (const auto &e: errors) {
-                ImGui::Text(e.c_str());
+                ImGui::TextWrapped(e.c_str());
             }
 
             ImGui::EndListBox();
