@@ -19,6 +19,13 @@
 #define EPISODES_CACHE_FN   "episodes.json"
 #define SERIES_CACHE_FN     "series.json"
 
+// include the windows libraries here because the macros interfere with our other headers
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#define NOGDI
+#include <windows.h>
+#include <shellapi.h>
+
 namespace app 
 {
 
@@ -220,6 +227,20 @@ bool SeriesFolder::execute_actions() {
 
     std::scoped_lock lock(m_state_mutex);
     return rename_series_directory(m_path, m_state);
+}
+
+// execute the shell command to open the folder or file
+void SeriesFolder::open_folder(std::string &path) {
+    auto filepath = m_path / path;
+    auto parent_dir = filepath.remove_filename();
+    auto parent_dir_str = parent_dir.string();
+    ShellExecuteA(NULL, "open", parent_dir_str.c_str(), NULL, NULL, SW_SHOW);
+}
+
+void SeriesFolder::open_file(std::string &path) {
+    auto filepath = m_path / path;
+    auto filepath_str = filepath.string();
+    ShellExecuteA(NULL, "open", filepath_str.c_str(), NULL, NULL, SW_SHOW);
 }
 
 App::App(const char *config_filepath)

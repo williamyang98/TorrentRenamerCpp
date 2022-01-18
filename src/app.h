@@ -70,6 +70,8 @@ public:
     void update_state_from_cache();
     bool load_search_series_from_tvdb(const char *name, const char *token);
     bool execute_actions();
+    void open_folder(std::string &path);
+    void open_file(std::string &path);
 
 private:
     void push_error(const std::string &str);
