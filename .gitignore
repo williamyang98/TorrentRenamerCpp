@@ -1,6 +1,7 @@
 build/
 tests/
 
+credentials.json
 results.json
 imgui.ini
 logs.txt
