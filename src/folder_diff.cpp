@@ -70,7 +70,6 @@ void FolderDiff::OnIntentUpdate(FileIntent &intent, FileIntent::Action new_actio
 
 // same as change of intent's actions
 void FolderDiff::OnIntentUpdate(FileIntent &intent, bool new_is_active) {
-    // TODO: imgui checkbox fix required
     if (intent.is_active == new_is_active) {
         return;
     }

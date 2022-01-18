@@ -55,7 +55,7 @@ SeriesFolder::SeriesFolder(
 
 // thread safe push of error to list
 void SeriesFolder::push_error(const std::string &str) {
-    std::scoped_lock(m_errors_mutex);
+    std::scoped_lock lock(m_errors_mutex);
     m_errors.push_back(str);
 }
 
@@ -78,7 +78,7 @@ bool SeriesFolder::load_search_series_from_tvdb(const char *name, const char *to
 
     auto result = load_search_info(search_doc);
     {
-        std::scoped_lock(m_search_mutex);
+        std::scoped_lock lock(m_search_mutex);
         m_search_result = std::move(result);
     }
     return true;
@@ -119,8 +119,7 @@ bool SeriesFolder::load_cache_from_tvdb(uint32_t id, const char *token) {
 
     // update cache
     {
-        std::scoped_lock(m_cache_mutex);
-        // TODO: stress test this
+        std::scoped_lock lock(m_cache_mutex);
         TVDB_Cache cache = { series_cache, episodes_cache };
         m_cache = std::move(cache);
         m_is_info_cached = true;
@@ -128,14 +127,14 @@ bool SeriesFolder::load_cache_from_tvdb(uint32_t id, const char *token) {
 
     auto series_cache_path = fs::absolute(m_path / SERIES_CACHE_FN);
     if (!write_document_to_file(series_cache_path.string().c_str(), series_doc)) {
-        std::scoped_lock(m_errors_mutex);
+        std::scoped_lock lock(m_errors_mutex);
         push_error(std::string("Failed to write series cache file"));
         return false;
     }
 
     auto episodes_cache_path = fs::absolute(m_path / EPISODES_CACHE_FN);
     if (!write_document_to_file(episodes_cache_path.string().c_str(), episodes_doc)) {
-        std::scoped_lock(m_errors_mutex);
+        std::scoped_lock lock(m_errors_mutex);
         push_error(std::string("Failed to write series cache file"));
         return false;
     }
@@ -177,8 +176,7 @@ bool SeriesFolder::load_cache_from_file() {
     auto episodes_cache = load_series_episodes_info(episodes_doc);
 
     {
-        std::scoped_lock(m_cache_mutex);
-        // TODO: stress test this
+        std::scoped_lock lock(m_cache_mutex);
         TVDB_Cache cache = { series_cache, episodes_cache };
         m_cache = std::move(cache);
         m_is_info_cached = true;
@@ -211,10 +209,8 @@ void SeriesFolder::update_state_from_cache() {
         m_status = Status::EMPTY;
     }
 
-    std::scoped_lock(m_state_mutex);
-    // TODO: stress test this
+    std::scoped_lock lock(m_state_mutex);
     m_state = std::move(new_state);
-    // m_state = new_state;
 }
 
 // thread safe execute all actions in folder diff
@@ -222,7 +218,7 @@ bool SeriesFolder::execute_actions() {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
-    std::scoped_lock(m_state_mutex);
+    std::scoped_lock lock(m_state_mutex);
     return rename_series_directory(m_path, m_state);
 }
 
