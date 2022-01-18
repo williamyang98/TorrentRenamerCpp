@@ -616,9 +616,7 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
     bool is_modal_open = true;
 
     if (ImGui::BeginPopupModal(modal_title, &is_modal_open, 0)) {
-        ImGui::PushItemWidth(-1.0f);
         ImGui::InputText("##search_text", search_string, IM_ARRAYSIZE(search_string));
-        ImGui::PopItemWidth();
 
         ImGui::SameLine();
         if (ImGui::Button("Search")) {
