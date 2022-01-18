@@ -18,6 +18,7 @@ struct RenamingConfig {
     std::vector<std::string> blacklist_extensions;
     std::vector<std::string> whitelist_folders;
     std::vector<std::string> whitelist_files;
+    std::vector<std::string> whitelist_tags;
 };
 
 // produce an initial folder diff given the config 

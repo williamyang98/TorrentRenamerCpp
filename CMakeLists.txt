@@ -22,13 +22,14 @@ include_directories(cli_test src/)
 
 set(GUI_FILES
     src/app.cpp
+    src/app_config.cpp
     src/gui_ext.cpp)
 
 add_executable(main src/main_gui.cpp ${GUI_FILES} ${SRC_FILES})
 include_directories(main src/)
 
-set_target_properties(cli_test PROPERTIES CXX_STANDARD 17)
+set_target_properties(cli_test PROPERTIES CXX_STANDARD 20)
 target_link_libraries(cli_test PRIVATE cpr::cpr rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
 
-set_target_properties(main PROPERTIES CXX_STANDARD 17)
+set_target_properties(main PROPERTIES CXX_STANDARD 20)
 target_link_libraries(main PRIVATE cpr::cpr rapidjson fmt::fmt imgui::imgui spdlog::spdlog spdlog::spdlog_header_only opengl32)

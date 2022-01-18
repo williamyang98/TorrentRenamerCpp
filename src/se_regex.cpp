@@ -8,15 +8,18 @@
 
 namespace app {
 
-const std::regex TAG_REGEX("(\\[[a-zA-Z0-9]{2,}\\])");
+const std::regex TAG_REGEX("[\\[\\(]([a-zA-Z0-9]{2,})[\\]\\)]");
 
-static std::vector<std::string> find_tags(std::string &str_in) {
+static std::vector<std::string> find_tags(const std::string &str_in) {
     std::vector<std::string> tags;
     std::smatch res;
 
     std::string str_proc = str_in;
     while (std::regex_search(str_proc, res, TAG_REGEX)) {
-        tags.push_back(res[0]);
+        // we take the second group since that contains our enclosed tag
+        // the first group includes the surrounding brackets
+        const auto &tag = res[1];
+        tags.push_back(tag);
         str_proc = res.suffix();
     }
 

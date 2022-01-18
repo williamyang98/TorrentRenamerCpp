@@ -139,8 +139,8 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     for (int i = next_page; i <= last_page; i++) {
         auto r0 = get_page(i);
         if (r0.status_code != 200) {
-            spdlog::critical("Request failed in middle of page loading");
-            exit(1);
+            spdlog::critical("Request failed in middle of page loading for episodes data");
+            throw std::runtime_error("Request failed in middle of page loading for episodes data");
         }
 
         rapidjson::Document doc0;

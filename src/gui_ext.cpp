@@ -32,6 +32,8 @@ static void RenderErrors(App &main_app, SeriesFolder &folder);
 
 static void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder);
 
+static void RenderAppErrors(App &main_app);
+
 
 void RenderApp(App &main_app) {
     ImGui::Begin("Series");
@@ -46,7 +48,8 @@ void RenderApp(App &main_app) {
         ImGui::Text("Select a series");
     }
     ImGui::End();
-    
+
+    RenderAppErrors(main_app);
 }
 
 struct FolderStatusCharacter {
@@ -73,7 +76,7 @@ static FolderStatusCharacter GetFolderStatusCharacter(SeriesFolder::Status statu
 }
 
 void RenderSeriesList(App &main_app) {
-    const int busy_count = main_app.m_global_busy_count;
+    const int busy_count = main_app.get_folder_busy_count();
     ImGui::BeginDisabled(busy_count > 0);
     if (ImGui::Button("Refresh project structure")) {
         main_app.refresh_folders();
@@ -81,7 +84,7 @@ void RenderSeriesList(App &main_app) {
 
     if (ImGui::Button("Scan contents of all folders")) {
         for (auto &folder: main_app.m_folders) {
-            main_app.m_thread_pool.push([&folder](int pid) {
+            main_app.queue_async_call([&folder](int pid) {
                 folder.update_state_from_cache();
             });
         }
@@ -149,7 +152,7 @@ void RenderSeriesList(App &main_app) {
 
             if (selected_pressed) {
                 main_app.m_current_folder = &folder;
-                main_app.m_thread_pool.push([&folder](int pid) {
+                main_app.queue_async_call([&folder](int pid) {
                     folder.update_state_from_cache();
                 });
             }
@@ -208,14 +211,14 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
     ImGui::BeginDisabled(is_busy);
 
     if (ImGui::Button("Scan for changes")) {
-        main_app.m_thread_pool.push([&folder](int pid) {
+        main_app.queue_async_call([&folder](int pid) {
             folder.update_state_from_cache();
         });
     }
 
     ImGui::SameLine();
     if (ImGui::Button("Refresh from cache")) {
-        main_app.m_thread_pool.push([&folder](int pid) {
+        main_app.queue_async_call([&folder](int pid) {
             folder.load_cache_from_file();
             folder.update_state_from_cache();
         });
@@ -223,7 +226,7 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
 
     ImGui::SameLine();
     if (ImGui::Button("Download and refresh from tvdb")) {
-        main_app.m_thread_pool.push([&folder, &main_app](int pid) {
+        main_app.queue_async_call([&folder, &main_app](int pid) {
             folder.load_cache_from_tvdb(folder.m_cache.series.id, main_app.m_token.c_str());
             folder.update_state_from_cache();
         });
@@ -231,7 +234,7 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
 
     ImGui::SameLine();
     if (ImGui::Button("Execute changes")) {
-        main_app.m_thread_pool.push([&folder, &main_app](int pid) {
+        main_app.queue_async_call([&folder, &main_app](int pid) {
             folder.execute_actions();
             folder.update_state_from_cache();
         });
@@ -358,8 +361,9 @@ void RenderFilesRename(FolderDiff &state) {
             ImGui::PushID(row_id++);
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            if (ImGui::Checkbox("##intent_checkbox", &intent.is_active)) {
-                state.OnIntentUpdate(intent, intent.is_active);
+            bool is_active_copy = intent.is_active;
+            if (ImGui::Checkbox("##intent_checkbox", &is_active_copy)) {
+                state.OnIntentUpdate(intent, is_active_copy);
             }
 
             ImGui::TableSetColumnIndex(1);
@@ -413,8 +417,10 @@ void RenderFilesDelete(FolderDiff &state) {
 
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
-            if (ImGui::Checkbox("##active checkbox", &intent.is_active)) {
-                state.OnIntentUpdate(intent, intent.is_active);
+
+            bool is_active_copy = intent.is_active;
+            if (ImGui::Checkbox("##active checkbox", &is_active_copy)) {
+                state.OnIntentUpdate(intent, is_active_copy);
             }
 
             ImGui::TableSetColumnIndex(1);
@@ -464,8 +470,9 @@ void RenderFilesConflict(FolderDiff &state) {
                 ImGui::TableSetColumnIndex(0);
 
                 if (intent.action == FileIntent::Action::RENAME) {
-                    if (ImGui::Checkbox("##active_check", &intent.is_active)) {
-                        state.OnIntentUpdate(intent, intent.is_active);
+                    bool is_active_copy = intent.is_active;
+                    if (ImGui::Checkbox("##active_check", &is_active_copy)) {
+                        state.OnIntentUpdate(intent, is_active_copy);
                     }
                 }
 
@@ -589,7 +596,7 @@ void RenderErrors(App &main_app, SeriesFolder &folder) {
 }
 
 void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
-    static const char *modal_title = "Series Selection Modal";
+    static const char *modal_title = "Select a series###series selection modal";
 
     if (ImGui::Button("Select Series")) {
         ImGui::OpenPopup(modal_title);
@@ -609,7 +616,7 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
         ImGui::InputText("##search_text", search_string, IM_ARRAYSIZE(search_string));
         ImGui::SameLine();
         if (ImGui::Button("Search")) {
-            main_app.m_thread_pool.push([&folder, buf, &main_app](int pid) {
+            main_app.queue_async_call([&folder, buf, &main_app](int pid) {
                 folder.load_search_series_from_tvdb(buf, main_app.m_token.c_str());
             });
         }
@@ -644,7 +651,7 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
                 ImGui::TableSetColumnIndex(4);
                 if (ImGui::Button("Select")) {
                     uint32_t id = r.id;
-                    main_app.m_thread_pool.push([id, &folder, &main_app](int pid) {
+                    main_app.queue_async_call([id, &folder, &main_app](int pid) {
                         folder.load_cache_from_tvdb(id, main_app.m_token.c_str());
                         folder.update_state_from_cache();
                     });
@@ -654,6 +661,36 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
             }
 
             ImGui::EndTable();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void RenderAppErrors(App &main_app) {
+    static const char *modal_title = "Application error###app error modal";
+
+    std::scoped_lock error_lock(main_app.m_app_errors_mutex); 
+    auto &errors = main_app.m_app_errors;
+    if (errors.size() == 0) {
+        return;
+    }
+
+    ImGui::OpenPopup(modal_title);
+    
+    // Always center this window when appearing
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+    if (ImGui::BeginPopupModal(modal_title, NULL, 0)) {
+        ImGui::Text("The application has encounted an error");
+        ImGui::Text("Please restart the application");
+        ImGui::Separator();
+        if (ImGui::BeginListBox("##app error list")) {
+            for (const auto &e: errors) {
+                ImGui::Text(e.c_str());
+            }
+
+            ImGui::EndListBox();
         }
         ImGui::EndPopup();
     }

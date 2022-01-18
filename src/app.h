@@ -7,6 +7,7 @@
 #include <list>
 #include <atomic>
 #include <mutex>
+#include <functional>
 
 #include "tvdb_api.h"
 #include "se_regex.h"
@@ -71,8 +72,19 @@ public:
     bool execute_actions();
 
 private:
-    void push_error(std::string &str);
+    void push_error(const std::string &str);
 };
+
+struct AppConfig {
+    std::string credentials_filepath;
+    std::string schema_filepath;
+    std::vector<std::string> whitelist_folders;
+    std::vector<std::string> whitelist_filenames;
+    std::vector<std::string> blacklist_extensions; 
+    std::vector<std::string> whitelist_tags; 
+};
+
+AppConfig load_app_config_from_filepath(const char *filename);
 
 // Main app object which contains all folders
 class App 
@@ -82,17 +94,23 @@ public:
     RenamingConfig m_cfg;
     app_schema_t m_schema;
     std::string m_token;
+    std::string m_credentials_filepath;
 
     std::list<SeriesFolder> m_folders;
     SeriesFolder *m_current_folder;
 
-
+    std::vector<std::string> m_app_errors;
+    std::mutex m_app_errors_mutex;
+private:
     ctpl::thread_pool m_thread_pool;
     std::atomic<int> m_global_busy_count;
 public:
-    App();
+    App(const char *config_filepath);
     void authenticate();
     void refresh_folders();
+    int get_folder_busy_count() { return m_global_busy_count; }
+    void queue_async_call(std::function<void (int)> call);
+    void queue_app_error(const std::string &error);
 };
 
 };

@@ -43,7 +43,8 @@ int run(const fs::path &root);
 
 int main(int argc, char **argv) {
     if (argc == 1) {
-        std::cout << "Usage main <root_dir>" << std::endl;
+        std::cout << "Usage: main <root_dir>" << std::endl;
+        spdlog::warn(fmt::format("Usage: main <root_dir>" ));
         return 1;
     }
 
@@ -121,10 +122,10 @@ int run(const fs::path &root) {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Our state
-    bool show_demo_window = true;
+    bool show_demo_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    app::App main_app;
+    app::App main_app("app_config.json");
     main_app.m_root = root;
     main_app.refresh_folders();
 

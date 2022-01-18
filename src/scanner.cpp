@@ -3,6 +3,8 @@
 #include <string>
 #include <fmt/core.h>
 #include <sstream>
+#include <iterator>
+#include <ranges>
 
 #include "Instrumentor.h"
 #include "console_colours.h"
@@ -16,21 +18,28 @@ namespace app {
 namespace fs = std::filesystem;
 
 // create filename from given parameters
+// {title}-S{season:02d}E{episode:02d}-{name}.[TAG1][TAG2].ext
+template <typename Collection>
 std::string create_filename(
     const std::string &title, int season, int episode, 
     const std::string &name, const std::string &ext, 
-    const std::vector<std::string> &tags) 
+    Collection tags)
 {
     std::stringstream ss;
     ss << fmt::format("{}-S{:02d}E{:02d}", title, season, episode);
     if (name.size() > 0) {
         ss << "-" << name;
     }
-    if (tags.size() > 0) {
-        ss << ".";
-    }
-    for (auto &tag: tags) {
-        ss << tag;
+
+    // create tag group
+    bool created_prepend = false;
+    for (auto tag: tags) {
+        // prepend delimiter if there are tags
+        if (!created_prepend) {
+            ss << ".";
+            created_prepend = true;
+        }
+        ss << '[' << tag << ']';
     }
     ss << "." << ext;
 
@@ -51,7 +60,7 @@ FolderDiff scan_directory(
     }
 
     // get required actions into folder diff
-    auto &dir = fs::recursive_directory_iterator(root);
+    auto dir = fs::recursive_directory_iterator(root);
     for (auto &e: dir) {
         if (!fs::is_regular_file(e)) {
             continue;
@@ -143,6 +152,16 @@ FolderDiff scan_directory(
         const auto &ep_table = cache.episodes;
         const auto new_parent_dir = root / fmt::format("Season {:02d}", key.season);
 
+        // create tags
+        const auto &valid_tags = match.tags | std::views::filter([&cfg](const std::string &tag) {
+            return std::find_if(
+                cfg.whitelist_tags.begin(),
+                cfg.whitelist_tags.end(),
+                [&tag] (const std::string &valid_tag) {
+                    return tag.compare(0, valid_tag.size(), valid_tag) == 0;
+                }) != cfg.whitelist_tags.end();
+        });
+
         std::string dest_fn;
         // if unable to retrieve tvdb data, give generic rename
         if (ep_table.find(key) == ep_table.end()) {
@@ -153,7 +172,7 @@ FolderDiff scan_directory(
                 match.episode,
                 "",
                 match.ext,
-                match.tags
+                valid_tags
             );
         // rename according to the metadata
         } else {
@@ -165,7 +184,7 @@ FolderDiff scan_directory(
                 match.episode,
                 app::clean_se_name(ep.name),
                 match.ext,
-                match.tags
+                valid_tags
             );
         }
         PROFILE_MANUAL_END(pending_block);

@@ -1,0 +1,17 @@
+{
+    "credentials_file": "credentials.json",
+    "schema_file": "schema.json",
+    "whitelist_folders": [
+        "Extras/"
+    ],
+    "whitelist_filenames": [
+        "series.json",
+        "episodes.json"
+    ],
+    "blacklist_extensions": [
+        ".nfo", ".exe"
+    ],
+    "whitelist_tags": [
+        "DC", "EXTENDED", "ALT", "ALTERNATE"
+    ]
+}

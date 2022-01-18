@@ -4,6 +4,7 @@
 #include <vector>
 #include <mutex>
 #include <thread>
+#include <functional>
 
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
@@ -53,7 +54,7 @@ SeriesFolder::SeriesFolder(
 }
 
 // thread safe push of error to list
-void SeriesFolder::push_error(std::string &str) {
+void SeriesFolder::push_error(const std::string &str) {
     std::scoped_lock(m_errors_mutex);
     m_errors.push_back(str);
 }
@@ -75,10 +76,10 @@ bool SeriesFolder::load_search_series_from_tvdb(const char *name, const char *to
         return false;
     }
 
-    auto result = std::move(load_search_info(search_doc));
+    auto result = load_search_info(search_doc);
     {
         std::scoped_lock(m_search_mutex);
-        m_search_result = result;
+        m_search_result = std::move(result);
     }
     return true;
 }
@@ -119,7 +120,9 @@ bool SeriesFolder::load_cache_from_tvdb(uint32_t id, const char *token) {
     // update cache
     {
         std::scoped_lock(m_cache_mutex);
-        m_cache = { series_cache, episodes_cache };
+        // TODO: stress test this
+        TVDB_Cache cache = { series_cache, episodes_cache };
+        m_cache = std::move(cache);
         m_is_info_cached = true;
     }
 
@@ -175,7 +178,9 @@ bool SeriesFolder::load_cache_from_file() {
 
     {
         std::scoped_lock(m_cache_mutex);
-        m_cache = { series_cache, episodes_cache };
+        // TODO: stress test this
+        TVDB_Cache cache = { series_cache, episodes_cache };
+        m_cache = std::move(cache);
         m_is_info_cached = true;
     }
     return true;
@@ -207,7 +212,9 @@ void SeriesFolder::update_state_from_cache() {
     }
 
     std::scoped_lock(m_state_mutex);
-    m_state = new_state;
+    // TODO: stress test this
+    m_state = std::move(new_state);
+    // m_state = new_state;
 }
 
 // thread safe execute all actions in folder diff
@@ -219,39 +226,55 @@ bool SeriesFolder::execute_actions() {
     return rename_series_directory(m_path, m_state);
 }
 
-App::App()
+App::App(const char *config_filepath)
 : m_thread_pool(std::thread::hardware_concurrency()) 
 {
     m_current_folder = nullptr;
     m_global_busy_count = 0;
 
-    // TODO: load config for user defined control
-    // setup our config
-    m_cfg.blacklist_extensions.push_back(".nfo");
-    m_cfg.blacklist_extensions.push_back(".ext");
+    try {
+        auto cfg = load_app_config_from_filepath(config_filepath);
 
-    m_cfg.whitelist_folders.push_back("Extras");
-    m_cfg.whitelist_files.push_back("episodes.json");
-    m_cfg.whitelist_files.push_back("series.json");
+        // setup our renaming config
+        for (auto &v: cfg.blacklist_extensions) {
+            m_cfg.blacklist_extensions.push_back(v);
+        }
+        for (auto &v: cfg.whitelist_folders) {
+            m_cfg.whitelist_folders.push_back(v);
+        }
+        for (auto &v: cfg.whitelist_filenames) {
+            m_cfg.whitelist_files.push_back(v);
+        }
+        for (auto &v: cfg.whitelist_tags) {
+            m_cfg.whitelist_tags.push_back(v);
+        }
 
-    m_schema = load_schema_from_file("schema.json");
-
-    authenticate();
+        m_schema = load_schema_from_file(cfg.schema_filepath.c_str());
+        m_credentials_filepath = cfg.credentials_filepath;
+        authenticate();
+    } catch (std::exception &e) {
+        queue_app_error(e.what());
+    }
 }
 
 // get a new token which can be used for a few hours
 void App::authenticate() {
-    auto cred_res = load_document_from_file("credentials.json");
+    auto cred_fp = m_credentials_filepath.c_str();
+    auto cred_res = load_document_from_file(cred_fp);
     if (cred_res.code != DocumentLoadCode::OK) {
-        spdlog::error("Failed to load credentials file");
-        exit(1);
+        auto err = "Failed to load credentials file";
+        spdlog::error(err);
+        queue_app_error(err);
+        return;
     }
 
     auto cred_doc = std::move(cred_res.doc);
 
     if (!validate_document(cred_doc, m_schema.at(std::string(SCHEME_CRED_KEY)))) {
-        spdlog::error("Credentials file is in the wrong format");
-        exit(1);
+        auto err = fmt::format("Credentials file is in the wrong format ({})", cred_fp);
+        spdlog::error(err);
+        queue_app_error(err);
+        return;
     }
 
     {
@@ -262,7 +285,8 @@ void App::authenticate() {
         
         if (!res) {
             spdlog::error("Failed to login");
-            exit(1);
+            queue_app_error("Failed to login");
+            return;
         }
 
         m_token = res.value();
@@ -278,12 +302,34 @@ void App::refresh_folders() {
     m_folders.clear();
     m_current_folder = nullptr;
 
-    for (auto &subdir: fs::directory_iterator(m_root)) {
-        if (!subdir.is_directory()) {
-            continue;
+    try {
+        for (auto &subdir: fs::directory_iterator(m_root)) {
+            if (!subdir.is_directory()) {
+                continue;
+            }
+            m_folders.emplace_back(subdir, m_schema, m_cfg, m_global_busy_count);
         }
-        m_folders.emplace_back(subdir, m_schema, m_cfg, m_global_busy_count);
+    } catch (std::exception &e) {
+        queue_app_error(e.what());
     }
+}
+
+// push a call into the thread pool and queue any exceptions that occur
+// we do this so our gui can get a list of exceptions and render them
+void App::queue_async_call(std::function<void (int)> call) {
+    m_thread_pool.push([call, this](int pid) {
+        try {
+            call(pid);
+        } catch (std::exception &e) {
+            queue_app_error(e.what());
+        }
+    });
+}
+
+// mutex protected addition of error
+void App::queue_app_error(const std::string &error) {
+    std::scoped_lock lock(m_app_errors_mutex);
+    m_app_errors.push_back(error);
 }
 
 };
