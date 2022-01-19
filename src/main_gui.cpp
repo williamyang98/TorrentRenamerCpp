@@ -36,7 +36,7 @@ static void glfw_error_callback(int error, const char* description)
 }
 
 namespace fs = std::filesystem;
-int run(const fs::path &root);
+int run(const char *root_path);
 
 // tell compiler to not link as /SUBSYSTEM:console which adds an extra command prompt
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
@@ -45,14 +45,14 @@ int main(int argc, char **argv) {
     if (argc == 1) {
         std::cout << "Usage: main <root_dir>" << std::endl;
         spdlog::warn(fmt::format("Usage: main <root_dir>" ));
-        return 1;
+        // return 1;
     }
 
     auto logger = spdlog::basic_logger_mt("root", "logs.txt");
     spdlog::set_default_logger(logger);
 
     try {
-        auto root_path = fs::path(argv[1]);
+        const char *root_path = (argc > 1) ? argv[1] : NULL;
         return run(root_path);
     } catch (std::exception &ex) {
         spdlog::critical(fmt::format("Exception in main: {}", ex.what()));
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     return 1;
 }
 
-int run(const fs::path &root) {
+int run(const char *root_path) {
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -123,11 +123,20 @@ int run(const fs::path &root) {
 
     // Our state
     bool show_demo_window = false;
+#ifndef NDEBUG
+    show_demo_window = true;
+#endif
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+
     app::App main_app("app_config.json");
-    main_app.m_root = root;
-    main_app.refresh_folders();
+
+    if (root_path == NULL) {
+        main_app.queue_app_error("Please specify a filepath as an argument when starting the application");
+    } else {
+        main_app.m_root = fs::path(root_path);
+        main_app.refresh_folders();
+    }
 
     // Main loop
     while (!glfwWindowShouldClose(window))
