@@ -15,12 +15,33 @@
 #include <spdlog/spdlog.h>
 
 #include "tvdb_api.h"
+#include "tvdb_api_schema.h"
 
 namespace tvdb_api 
 {
 
 // #define BASE_URL "https://api.thetvdb.com/"
 #define BASE_URL "http://api.thetvdb.com/"
+
+void validate_response(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {
+    rapidjson::SchemaValidator validator(schema_doc);
+    if (doc.Accept(validator)) {
+        return;
+    }
+    spdlog::error("Api response doesn't match schema");
+
+    rapidjson::StringBuffer sb;
+    validator.GetInvalidDocumentPointer().StringifyUriFragment(sb);
+    spdlog::error(fmt::format("document pointer: {}", sb.GetString()));
+    spdlog::error(fmt::format("error-type: {}", validator.GetInvalidSchemaKeyword()));
+    sb.Clear();
+
+    validator.GetInvalidSchemaPointer().StringifyUriFragment(sb);
+    spdlog::error(fmt::format("schema pointer: {}", sb.GetString()));
+    sb.Clear();
+
+    throw std::runtime_error("tvdb api response failed to match schema");
+}
 
 cpr::Header create_token_header(const char *token) {
     return cpr::Header{{"Authorization", "Bearer " + std::string(token)}};
@@ -76,6 +97,7 @@ std::optional<rapidjson::Document> search_series(const char *name, const char *t
     rapidjson::Document doc;
     doc.Parse(r.text.c_str());
     doc.Swap(doc["data"]);
+    validate_response(doc, SEARCH_DATA_SCHEMA);
     return doc;
 }
 
@@ -92,9 +114,8 @@ std::optional<rapidjson::Document> get_series(sid_t id, const char *token) {
     rapidjson::Document doc;
     doc.Parse(r.text.c_str());
     doc.Swap(doc["data"]);
+    validate_response(doc, SERIES_DATA_SCHEMA);
     return doc;
-
-
 }
 
 std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *token) {
@@ -148,6 +169,7 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
         add_episodes(doc0);
     }
     
+    validate_response(combined_doc, EPISODES_DATA_SCHEMA);
     return combined_doc;
 }
 

@@ -16,13 +16,14 @@
 #include "Instrumentor.h"
 #include "console_colours.h"
 
+#include "app_credentials_schema.h"
 #include "tvdb_api.h"
 #include "scanner.h"
 #include "file_loading.h"
 
 namespace fs = std::filesystem;
 
-void scan_directory(const fs::path &subdir, app::app_schema_t &schema);
+void scan_directory(const fs::path &subdir);
 void assert_validation(bool is_valid, const char *message);
 rapidjson::Document assert_document_load(app::DocumentLoadResult res, const char *message);
 
@@ -32,14 +33,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto schema_file = app::load_schema_from_file("schema.json");
     auto cred_doc = assert_document_load(
         app::load_document_from_file("credentials.json"),
         "Loading credentials file");
 
-    auto &validator = schema_file.at(std::string(SCHEME_CRED_KEY));
     assert_validation(
-        app::validate_document(cred_doc, validator), 
+        app::validate_document(cred_doc, app::CREDENTIALS_SCHEMA), 
         "Credentials file");
 
     app::write_json_to_stream(cred_doc, std::cout);
@@ -54,10 +53,10 @@ int main(int argc, char** argv) {
             if (!subdir.is_directory()) {
                 continue;
             }
-            scan_directory(subdir, schema_file);
+            scan_directory(subdir);
         }
     } else {
-        scan_directory(root, schema_file);
+        scan_directory(root);
     }
 
     // Instrumentor::Get().EndSession();
@@ -81,7 +80,7 @@ rapidjson::Document assert_document_load(app::DocumentLoadResult res, const char
     return std::move(res.doc);
 }
 
-void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
+void scan_directory(const fs::path &subdir) {
     std::cout << "Scanning directory: " << subdir << std::endl;
 
     rapidjson::Document series_info, episodes_info;
@@ -105,7 +104,7 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
             "Loading credentials file");
 
         assert_validation(
-            app::validate_document(cred_doc, schema.at(std::string(SCHEME_CRED_KEY))),
+            app::validate_document(cred_doc, app::CREDENTIALS_SCHEMA),
             "Validating credentials file");
 
         const fs::path series_cache_fn = subdir / "series.json";
@@ -139,14 +138,6 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
 
         episodes_info = std::move(episodes_info_doc.value());
     }
-
-    assert_validation(
-        app::validate_document(series_info, schema.at(std::string(SCHEME_SERIES_KEY))),
-        "Validating series info");
-
-    assert_validation(
-        app::validate_document(episodes_info, schema.at(std::string(SCHEME_EPISODES_KEY))),
-        "Validating episodes info");
 
     auto series_cache   = app::load_series_info(series_info);
     auto episodes_cache = app::load_series_episodes_info(episodes_info);

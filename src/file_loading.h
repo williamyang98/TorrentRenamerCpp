@@ -7,15 +7,8 @@
 #include <rapidjson/document.h>
 #include <rapidjson/schema.h>
 
-#define SCHEME_CRED_KEY     "credentials_file" 
-#define SCHEME_SERIES_KEY   "series_data" 
-#define SCHEME_EPISODES_KEY "episodes_data"
-#define SCHEME_SEARCH_KEY   "search_data"
-
 namespace app
 {
-
-typedef std::unordered_map<std::string, rapidjson::SchemaDocument> app_schema_t;
 
 // stores info about series
 struct SeriesInfo {
@@ -76,9 +69,6 @@ SeriesInfo load_series_info(const rapidjson::Document &doc);
 EpisodesMap load_series_episodes_info(const rapidjson::Document &doc);
 std::vector<SeriesInfo> load_search_info(const rapidjson::Document &doc);
 
-// load our validation schema from a file
-app_schema_t load_app_schema_from_buffer(const char *data);
-app_schema_t load_schema_from_file(const char *schema_fn);
 // use validation schema and log any errors 
 bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc);
 

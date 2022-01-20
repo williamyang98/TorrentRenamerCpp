@@ -33,7 +33,6 @@ public:
     };
 public:
     const std::filesystem::path m_path;
-    app_schema_t &m_schema;
     RenamingConfig &m_cfg;
 
     // keep a mutex on members which are used in rendering and undergo mutation during actions
@@ -62,7 +61,6 @@ public:
 public:
     SeriesFolder(
         const std::filesystem::path &path, 
-        app_schema_t &schema, 
         RenamingConfig &cfg,
         std::atomic<int> &busy_count);
 
@@ -95,7 +93,6 @@ class App
 public:
     std::filesystem::path m_root;
     RenamingConfig m_cfg;
-    app_schema_t m_schema;
     std::string m_token;
     std::string m_credentials_filepath;
 

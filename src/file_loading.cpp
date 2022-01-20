@@ -12,6 +12,7 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
+#include <rapidjson/schema.h>
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
@@ -36,7 +37,7 @@ SeriesInfo load_series_info(const rapidjson::Document &doc) {
 
 EpisodesMap load_series_episodes_info(const rapidjson::Document &doc) {
     auto episodes = EpisodesMap();
-    auto &data = doc.GetArray();
+    auto data = doc.GetArray();
 
     auto get_string_default = [](const rapidjson::Value &v) {
         return v.IsString() ? v.GetString() : "";
@@ -75,41 +76,6 @@ std::vector<SeriesInfo> load_search_info(const rapidjson::Document &doc) {
     }
     
     return series;
-}
-
-app_schema_t load_app_schema_from_buffer(const char *data) {
-    app_schema_t schema;
-
-    rapidjson::Document doc;
-    doc.Parse(data);
-
-    static std::array<const char *, 4> REQUIRED_KEYS = 
-        {SCHEME_CRED_KEY, SCHEME_SERIES_KEY, SCHEME_EPISODES_KEY, SCHEME_SEARCH_KEY};
-    
-    for (const auto &key: REQUIRED_KEYS) {
-        if (!doc.HasMember(key)) {
-            throw std::runtime_error(fmt::format("App schema missing key ({})", key));
-        }
-
-        rapidjson::Document sub_doc;
-        sub_doc.CopyFrom(doc[key], doc.GetAllocator());
-        schema.emplace(std::string(key), sub_doc);
-    }
-
-    return schema;
-}
-
-app_schema_t load_schema_from_file(const char *schema_fn) {
-    std::ifstream file(schema_fn);
-    if (!file.is_open()) {
-        throw std::runtime_error(fmt::format("Schema file missing at filename=({})", schema_fn));
-    }
-
-    std::stringstream ss;
-    ss << file.rdbuf();
-    file.close();
-
-    return app::load_app_schema_from_buffer(ss.str().c_str());
 }
 
 bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {

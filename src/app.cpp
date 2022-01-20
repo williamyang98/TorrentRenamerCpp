@@ -12,7 +12,9 @@
 #include <fmt/core.h>
 
 #include "app.h"
+#include "app_credentials_schema.h"
 #include "tvdb_api.h"
+#include "tvdb_api_schema.h"
 #include "se_regex.h"
 #include "scanner.h"
 #include "file_loading.h"
@@ -52,10 +54,9 @@ public:
 
 SeriesFolder::SeriesFolder(
     const fs::path &path, 
-    app_schema_t &schema, 
     RenamingConfig &cfg,
     std::atomic<int> &busy_count) 
-: m_path(path), m_schema(schema), m_cfg(cfg), m_global_busy_count(busy_count) 
+: m_path(path), m_cfg(cfg), m_global_busy_count(busy_count) 
 {
     m_is_info_cached = false;
     m_is_busy = false;
@@ -74,24 +75,25 @@ bool SeriesFolder::load_search_series_from_tvdb(const char *name, const char *to
     if (m_is_busy) return false;
 
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
-    auto search_opt = tvdb_api::search_series(name, token);
-    if (!search_opt) {
-        push_error(std::string("Failed to get search results from tvdb"));
+
+    try {
+        auto search_opt = tvdb_api::search_series(name, token);
+        if (!search_opt) {
+            push_error(std::string("Failed to get search results from tvdb"));
+            return false;
+        }
+
+        auto search_doc = std::move(search_opt.value());
+        auto result = load_search_info(search_doc);
+        {
+            std::scoped_lock lock(m_search_mutex);
+            m_search_result = std::move(result);
+        }
+    } catch (std::exception &ex) {
+        push_error(std::string(ex.what()));
         return false;
     }
-
-    auto search_doc = std::move(search_opt.value());
-    if (!validate_document(search_doc, m_schema.at(SCHEME_SEARCH_KEY))) {
-        push_error(std::string("Failed to validate search results json"));
-        return false;
-    }
-
-    auto result = load_search_info(search_doc);
-    {
-        std::scoped_lock lock(m_search_mutex);
-        m_search_result = std::move(result);
-    }
-    return true;
+    return false;
 }
 
 // thread safe load series and episodes data from tvdb with validation, and store as cache
@@ -99,53 +101,46 @@ bool SeriesFolder::load_cache_from_tvdb(uint32_t id, const char *token) {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
-    auto series_opt = tvdb_api::get_series(id, token);
-    if (!series_opt) {
-        push_error(std::string("Failed to fetch series info from tvdb"));
-        return false;
-    }
+    try {
+        auto series_opt = tvdb_api::get_series(id, token);
+        if (!series_opt) {
+            push_error(std::string("Failed to fetch series info from tvdb"));
+            return false;
+        }
 
-    auto episodes_opt = tvdb_api::get_series_episodes(id, token);
-    if (!episodes_opt) {
-        push_error(std::string("Failed to fetch episodes info from tvdb"));
-        return false;
-    }
+        auto episodes_opt = tvdb_api::get_series_episodes(id, token);
+        if (!episodes_opt) {
+            push_error(std::string("Failed to fetch episodes info from tvdb"));
+            return false;
+        }
 
-    rapidjson::Document series_doc = std::move(series_opt.value());
-    rapidjson::Document episodes_doc = std::move(episodes_opt.value());
+        auto series_doc = std::move(series_opt.value());
+        auto episodes_doc = std::move(episodes_opt.value());
+        auto series_cache = load_series_info(series_doc);
+        auto episodes_cache = load_series_episodes_info(episodes_doc);
+        // update cache
+        {
+            std::scoped_lock lock(m_cache_mutex);
+            TVDB_Cache cache = { series_cache, episodes_cache };
+            m_cache = std::move(cache);
+            m_is_info_cached = true;
+        }
 
-    if (!validate_document(series_doc, m_schema.at(std::string(SCHEME_SERIES_KEY)))) {
-        push_error(std::string("Failed to validate series json"));
-        return false;
-    }
+        auto series_cache_path = fs::absolute(m_path / SERIES_CACHE_FN);
+        if (!write_document_to_file(series_cache_path.string().c_str(), series_doc)) {
+            std::scoped_lock lock(m_errors_mutex);
+            push_error(std::string("Failed to write series cache file"));
+            return false;
+        }
 
-    if (!validate_document(episodes_doc, m_schema.at(std::string(SCHEME_EPISODES_KEY)))) {
-        push_error(std::string("Failed to validate episodes json"));
-        return false;
-    }
-
-    auto series_cache = load_series_info(series_doc);
-    auto episodes_cache = load_series_episodes_info(episodes_doc);
-
-    // update cache
-    {
-        std::scoped_lock lock(m_cache_mutex);
-        TVDB_Cache cache = { series_cache, episodes_cache };
-        m_cache = std::move(cache);
-        m_is_info_cached = true;
-    }
-
-    auto series_cache_path = fs::absolute(m_path / SERIES_CACHE_FN);
-    if (!write_document_to_file(series_cache_path.string().c_str(), series_doc)) {
-        std::scoped_lock lock(m_errors_mutex);
-        push_error(std::string("Failed to write series cache file"));
-        return false;
-    }
-
-    auto episodes_cache_path = fs::absolute(m_path / EPISODES_CACHE_FN);
-    if (!write_document_to_file(episodes_cache_path.string().c_str(), episodes_doc)) {
-        std::scoped_lock lock(m_errors_mutex);
-        push_error(std::string("Failed to write series cache file"));
+        auto episodes_cache_path = fs::absolute(m_path / EPISODES_CACHE_FN);
+        if (!write_document_to_file(episodes_cache_path.string().c_str(), episodes_doc)) {
+            std::scoped_lock lock(m_errors_mutex);
+            push_error(std::string("Failed to write series cache file"));
+            return false;
+        }
+    } catch (std::exception &ex) {
+        push_error(std::string(ex.what()));
         return false;
     }
 
@@ -172,12 +167,12 @@ bool SeriesFolder::load_cache_from_file() {
     auto series_doc = std::move(series_res.doc);
     auto episodes_doc = std::move(episodes_res.doc);
 
-    if (!validate_document(series_doc, m_schema.at(std::string(SCHEME_SERIES_KEY)))) {
+    if (!validate_document(series_doc, tvdb_api::SERIES_DATA_SCHEMA)) {
         push_error(std::string("Failed to validate series data"));
         return false;
     }
 
-    if (!validate_document(episodes_doc, m_schema.at(std::string(SCHEME_EPISODES_KEY)))) {
+    if (!validate_document(episodes_doc, tvdb_api::EPISODES_DATA_SCHEMA)) {
         push_error(std::string("Failed to validate episodes data"));
         return false;
     }
@@ -278,7 +273,6 @@ App::App(const char *config_filepath)
             m_cfg.whitelist_tags.push_back(v);
         }
 
-        m_schema = load_schema_from_file(cfg.schema_filepath.c_str());
         m_credentials_filepath = cfg.credentials_filepath;
         authenticate();
     } catch (std::exception &e) {
@@ -299,7 +293,7 @@ void App::authenticate() {
 
     auto cred_doc = std::move(cred_res.doc);
 
-    if (!validate_document(cred_doc, m_schema.at(std::string(SCHEME_CRED_KEY)))) {
+    if (!validate_document(cred_doc, CREDENTIALS_SCHEMA)) {
         auto err = fmt::format("Credentials file is in the wrong format ({})", cred_fp);
         spdlog::error(err);
         queue_app_error(err);
@@ -336,7 +330,7 @@ void App::refresh_folders() {
             if (!subdir.is_directory()) {
                 continue;
             }
-            auto folder = std::make_shared<SeriesFolder>(subdir, m_schema, m_cfg, m_global_busy_count);
+            auto folder = std::make_shared<SeriesFolder>(subdir, m_cfg, m_global_busy_count);
             m_folders.push_back(std::move(folder));
         }
     } catch (std::exception &e) {
