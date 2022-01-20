@@ -10,11 +10,12 @@ namespace app
 
 namespace fs = std::filesystem;
 
-bool rename_series_directory(const fs::path &root, FolderDiff &state) {
+template <typename T>
+bool rename_series_directory(const fs::path &root, T &intents) {
     // TODO: Add checking and error handling for invalid states
     bool all_success = true;
 
-    for (auto &[key, intent]: state.intents) {
+    for (FileIntent &intent: intents) {
         if (!intent.is_active) {
             continue;
         }

@@ -8,6 +8,7 @@
 #include <atomic>
 #include <mutex>
 #include <functional>
+#include <memory>
 
 #include "tvdb_api.h"
 #include "se_regex.h"
@@ -42,7 +43,7 @@ public:
     std::mutex m_cache_mutex;
 
     // set of current actions
-    FolderDiff m_state;
+    std::unique_ptr<ManagedFolder> m_state;
     std::atomic<Status> m_status;
     std::mutex m_state_mutex;
 
@@ -70,8 +71,8 @@ public:
     void update_state_from_cache();
     bool load_search_series_from_tvdb(const char *name, const char *token);
     bool execute_actions();
-    void open_folder(std::string &path);
-    void open_file(std::string &path);
+    void open_folder(const std::string &path);
+    void open_file(const std::string &path);
 
 private:
     void push_error(const std::string &str);
@@ -98,8 +99,8 @@ public:
     std::string m_token;
     std::string m_credentials_filepath;
 
-    std::list<SeriesFolder> m_folders;
-    SeriesFolder *m_current_folder;
+    std::list<std::shared_ptr<SeriesFolder>> m_folders;
+    std::shared_ptr<SeriesFolder> m_current_folder;
 
     std::vector<std::string> m_app_errors;
     std::mutex m_app_errors_mutex;

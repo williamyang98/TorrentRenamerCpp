@@ -159,41 +159,45 @@ void scan_directory(const fs::path &subdir, app::app_schema_t &schema) {
 
     cfg.whitelist_folders.push_back("Extras");
 
-    auto actions = app::scan_directory(subdir, tvdb_cache, cfg);
-    actions.UpdateConflictTable();
-    auto &counts = actions.action_counts;
+    auto folder = app::ManagedFolder();
+    for (auto intent: app::scan_directory(subdir, tvdb_cache, cfg)) {
+        folder.AddIntent(intent);
+    }
+
+    auto &counts = folder.GetActionCount();
+    auto &conflicts = folder.GetConflicts();
     
     std::cout << "completed=" << counts.completes << std::endl;
     std::cout << "ignores=" << counts.ignores << std::endl;
     std::cout << "deletes=" << counts.deletes << std::endl;
-    std::cout << "conflicts=" << actions.conflicts.size() << std::endl;
+    std::cout << "conflicts=" << conflicts.size() << std::endl;
     std::cout << "pending=" << counts.renames << std::endl;
 
-    for (const auto &[key, intent]: actions.intents) {
-        if (intent.action != app::FileIntent::Action::COMPLETE) continue;
-        std::cout << FGRN("[C] ") << intent.src << std::endl;
+    for (const auto &[key, intent]: folder.GetIntents()) {
+        if (intent.GetAction() != app::FileIntent::Action::COMPLETE) continue;
+        std::cout << FGRN("[C] ") << intent.GetSrc() << std::endl;
     }
 
-    for (const auto &[key, intent]: actions.intents) {
-        if (intent.action != app::FileIntent::Action::IGNORE) continue;
-        std::cout << FMAG("[I] ") << intent.src << std::endl;
+    for (const auto &[key, intent]: folder.GetIntents()) {
+        if (intent.GetAction() != app::FileIntent::Action::IGNORE) continue;
+        std::cout << FMAG("[I] ") << intent.GetSrc() << std::endl;
     }
 
-    for (const auto &[key, intent]: actions.intents) {
-        if (intent.action != app::FileIntent::Action::RENAME) continue;
-        std::cout << FCYN("[P] ") << intent.src << " ==> " << intent.dest << std::endl;
+    for (const auto &[key, intent]: folder.GetIntents()) {
+        if (intent.GetAction() != app::FileIntent::Action::RENAME) continue;
+        std::cout << FCYN("[P] ") << intent.GetSrc() << " ==> " << intent.GetDest() << std::endl;
     }
 
-    for (const auto &[key, intent]: actions.intents) {
-        if (intent.action != app::FileIntent::Action::DELETE) continue;
-        std::cout << FYEL("[D] ") << intent.src << std::endl;
+    for (const auto &[key, intent]: folder.GetIntents()) {
+        if (intent.GetAction() != app::FileIntent::Action::DELETE) continue;
+        std::cout << FYEL("[D] ") << intent.GetSrc() << std::endl;
     }
 
-    for (const auto &[dest, keys]: actions.conflicts) {
+    for (const auto &[dest, keys]: conflicts) {
         std::cout << FRED("[?] (" << keys.size() << ") ") << dest << std::endl;
         for (auto &key: keys) {
-            auto intent = actions.intents[key];
-            std::cout << "\t\t" << intent.src << std::endl;
+            auto intent = folder.GetIntents().at(key);
+            std::cout << "\t\t" << intent.GetSrc() << std::endl;
         }
     }
 }

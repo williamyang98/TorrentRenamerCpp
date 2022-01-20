@@ -28,16 +28,18 @@ struct FileIntent {
     bool is_active;   // flag that can be used to disable/enable an action
 };
 
+class ManagedFileIntent;
+
 // file table
-typedef std::map<std::string, FileIntent> FileTable;
-// conflict table
+typedef std::map<std::string, ManagedFileIntent> FileTable;
+// conflict table (store keys into our file table)
 typedef std::map<std::string, std::list<std::string>> ConflictTable;
 // table for tracking upcoming additions
 typedef std::unordered_map<std::string, int> UpcomingCounts;
 
 // stores all pending diffs made to a series folder
 // also contains logic for determining which file intents produce conflicts
-class FolderDiff 
+class ManagedFolder 
 {
 public:
     struct ActionCount {
@@ -47,20 +49,61 @@ public:
         int completes = 0;
         int whitelists = 0;
     };
-public:
+private:
     FileTable intents;
     ConflictTable conflicts;
     UpcomingCounts upcoming_counts;
     ActionCount action_counts;
     bool is_conflict_table_dirty;
 public:
-    FolderDiff() : intents(), conflicts(), upcoming_counts(), is_conflict_table_dirty(false) {}
+    ManagedFolder() : intents(), conflicts(), upcoming_counts(), is_conflict_table_dirty(false) {}
     void AddIntent(FileIntent &intent);
-    void OnIntentUpdate(FileIntent &intent, FileIntent::Action new_action);
-    void OnIntentUpdate(FileIntent &intent, bool new_is_active);
-    void UpdateConflictTable();
+    inline FileTable &GetIntents() { return intents; }
+    ConflictTable &GetConflicts();
+    inline ActionCount &GetActionCount() { 
+        UpdateConflictTable();
+        return action_counts; 
+    }
+
+    // disable copy and move semantics which break the folder to file intent relationship
+    ManagedFolder(const ManagedFolder&) = delete;
+    ManagedFolder(ManagedFolder&&) = delete;
+    ManagedFolder& operator=(const ManagedFolder&) = delete;
+    ManagedFolder& operator=(ManagedFolder&&) = delete;
+public:
+    friend class ManagedFileIntent;
 private:
+    void UpdateConflictTable();
     void UpdateActionCount(FileIntent::Action action, int delta);
 };
+
+// wrapper for FileIntent which handles managing conflicting intents
+class ManagedFileIntent 
+{
+private:
+    ManagedFolder &m_folder;
+    FileIntent m_intent;
+public:
+    // transfer ownership of intent to managed file intent
+    ManagedFileIntent(ManagedFolder &folder, FileIntent &intent)
+    : m_folder(folder) {
+        m_intent = std::move(intent);
+    }
+
+    FileIntent& GetUnmanagedIntent() { return m_intent; }
+    void SetAction(FileIntent::Action new_action);
+    inline FileIntent::Action GetAction() const { return m_intent.action; }
+    void SetIsActive(bool new_is_active);
+    inline bool GetIsActive() const { return m_intent.is_active; }
+    inline const std::string &GetSrc() const { return m_intent.src; }
+    // difficult to setup a hook for detecting changes on std::string
+    inline std::string &GetDest() { return m_intent.dest; }
+    inline const std::string &GetDest() const { return m_intent.dest; }
+    void OnDestChange();
+
+    inline void SetIsConflict(bool new_is_conflict) { m_intent.is_conflict = new_is_conflict; }
+    inline bool GetIsConflict() const { return m_intent.is_conflict; }
+};
+
 
 }

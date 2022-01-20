@@ -19,11 +19,11 @@ namespace fs = std::filesystem;
 
 // create filename from given parameters
 // {title}-S{season:02d}E{episode:02d}-{name}.[TAG1][TAG2].ext
-template <typename Collection>
+template <typename T>
 std::string create_filename(
     const std::string &title, int season, int episode, 
     const std::string &name, const std::string &ext, 
-    Collection tags)
+    T &tags)
 {
     std::stringstream ss;
     ss << fmt::format("{}-S{:02d}E{:02d}", title, season, episode);
@@ -33,7 +33,7 @@ std::string create_filename(
 
     // create tag group
     bool created_prepend = false;
-    for (auto tag: tags) {
+    for (auto &tag: tags) {
         // prepend delimiter if there are tags
         if (!created_prepend) {
             ss << ".";
@@ -46,17 +46,17 @@ std::string create_filename(
     return ss.str();
 }
 
-FolderDiff scan_directory(
+std::vector<FileIntent> scan_directory(
     const fs::path &root, 
-    const TVDB_Cache &cache,
+    const TVDB_Cache &cache, 
     const RenamingConfig &cfg) 
 {
     PROFILE_FUNC();
 
-    FolderDiff ss;
+    std::vector<FileIntent> intents;
 
     if (!fs::is_directory(root)) {
-        return ss;
+        return intents;
     }
 
     // get required actions into folder diff
@@ -98,7 +98,7 @@ FolderDiff scan_directory(
             // std::cout << FMAG("[D] ") << old_rel_path << std::endl;
             intent.action = FileIntent::Action::DELETE;
             intent.is_active = false;
-            ss.AddIntent(intent);
+            intents.push_back(intent);
             continue;
         }
         PROFILE_MANUAL_END(blacklist);
@@ -123,7 +123,7 @@ FolderDiff scan_directory(
             // std::cout << FCYN("[I] ") << old_rel_path << std::endl;
             intent.action = FileIntent::Action::WHITELIST;
             intent.is_active = false;
-            ss.AddIntent(intent);
+            intents.push_back(intent);
             continue;
         }
         PROFILE_MANUAL_END(whitelist_check);
@@ -137,7 +137,7 @@ FolderDiff scan_directory(
             // std::cout << FCYN("[I] ") << old_rel_path << std::endl;
             intent.action = FileIntent::Action::IGNORE;
             intent.is_active = false;
-            ss.AddIntent(intent);
+            intents.push_back(intent);
             continue;
         }
 
@@ -153,7 +153,7 @@ FolderDiff scan_directory(
         const auto new_parent_dir = root / fmt::format("Season {:02d}", key.season);
 
         // create tags
-        const auto &valid_tags = match.tags | std::views::filter([&cfg](const std::string &tag) {
+        auto valid_tags = match.tags | std::views::filter([&cfg](const std::string &tag) {
             return std::find_if(
                 cfg.whitelist_tags.begin(),
                 cfg.whitelist_tags.end(),
@@ -198,18 +198,18 @@ FolderDiff scan_directory(
             // std::cout << FGRN("[C] ") << old_rel_path_str << std::endl;
             intent.action = FileIntent::Action::COMPLETE;
             intent.is_active = false;
-            ss.AddIntent(intent);
+            intents.push_back(intent);
         } else {
             // std::cout << FYEL("[R] ") << old_rel_path_str << " ==> "  << new_rel_path_str << std::endl;
             intent.action = FileIntent::Action::RENAME;
             intent.dest = new_rel_path_str;
             intent.is_active = true;
-            ss.AddIntent(intent);
+            intents.push_back(intent);
         }
         PROFILE_MANUAL_END(complete_check);
     }
 
-    return ss;
+    return intents;
 }
 
 };

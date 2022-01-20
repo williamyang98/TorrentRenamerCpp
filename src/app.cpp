@@ -5,6 +5,8 @@
 #include <mutex>
 #include <thread>
 #include <functional>
+#include <ranges>
+#include <memory>
 
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
@@ -58,6 +60,7 @@ SeriesFolder::SeriesFolder(
     m_is_info_cached = false;
     m_is_busy = false;
     m_status = SeriesFolder::Status::UNKNOWN;
+    m_state = std::move(std::make_unique<ManagedFolder>());
 }
 
 // thread safe push of error to list
@@ -199,14 +202,19 @@ void SeriesFolder::update_state_from_cache() {
     }
 
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
-    auto new_state = scan_directory(m_path, m_cache, m_cfg);
-    new_state.UpdateConflictTable();
+    auto intents = scan_directory(m_path, m_cache, m_cfg);
 
-    auto &counts = new_state.action_counts;
+    auto new_state = std::make_unique<ManagedFolder>();
+    for (auto &intent: intents) {
+        new_state->AddIntent(intent);
+    }
+
+    auto &counts = new_state->GetActionCount();
+    auto &conflict_table = new_state->GetConflicts();
 
     if (counts.deletes > 0) {
         m_status = Status::PENDING_DELETES;
-    } else if (new_state.conflicts.size() > 0) {
+    } else if (conflict_table.size() > 0) {
         m_status = Status::CONFLICTS;
     } else if ((counts.renames > 0) || (counts.ignores > 0)) {
         m_status = Status::PENDING_RENAME;
@@ -225,19 +233,23 @@ bool SeriesFolder::execute_actions() {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
+    auto intents = m_state->GetIntents() | std::views::values | std::views::transform([](auto &intent) {
+        return std::reference_wrapper(intent.GetUnmanagedIntent());
+    });
+
     std::scoped_lock lock(m_state_mutex);
-    return rename_series_directory(m_path, m_state);
+    return rename_series_directory(m_path, intents);
 }
 
 // execute the shell command to open the folder or file
-void SeriesFolder::open_folder(std::string &path) {
+void SeriesFolder::open_folder(const std::string &path) {
     auto filepath = m_path / path;
     auto parent_dir = filepath.remove_filename();
     auto parent_dir_str = parent_dir.string();
     ShellExecuteA(NULL, "open", parent_dir_str.c_str(), NULL, NULL, SW_SHOW);
 }
 
-void SeriesFolder::open_file(std::string &path) {
+void SeriesFolder::open_file(const std::string &path) {
     auto filepath = m_path / path;
     auto filepath_str = filepath.string();
     ShellExecuteA(NULL, "open", filepath_str.c_str(), NULL, NULL, SW_SHOW);
@@ -324,7 +336,8 @@ void App::refresh_folders() {
             if (!subdir.is_directory()) {
                 continue;
             }
-            m_folders.emplace_back(subdir, m_schema, m_cfg, m_global_busy_count);
+            auto folder = std::make_shared<SeriesFolder>(subdir, m_schema, m_cfg, m_global_busy_count);
+            m_folders.push_back(std::move(folder));
         }
     } catch (std::exception &e) {
         queue_app_error(e.what());

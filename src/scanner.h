@@ -23,7 +23,7 @@ struct RenamingConfig {
 
 // produce an initial folder diff given the config 
 // this uses a cache for fast lookup for episode names
-FolderDiff scan_directory(
+std::vector<FileIntent> scan_directory(
     const std::filesystem::path &root, 
     const TVDB_Cache &cache,
     const RenamingConfig &cfg);

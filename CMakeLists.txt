@@ -14,7 +14,8 @@ set(SRC_FILES
     src/file_loading.cpp
     src/folder_diff.cpp
     src/scanner.cpp
-    src/renamer.cpp
+    # we need template definition in header file for linker to work
+    # src/renamer.cpp 
 )
 
 add_executable(cli_test src/main_cli_test.cpp ${SRC_FILES})

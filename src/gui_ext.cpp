@@ -43,7 +43,7 @@ void RenderApp(App &main_app) {
     
     ImGui::Begin("Series folder");
     if (main_app.m_current_folder != nullptr) {
-        RenderSeriesFolder(main_app, *main_app.m_current_folder);
+        RenderSeriesFolder(main_app, *(main_app.m_current_folder));
     } else {
         ImGui::Text("Select a series");
     }
@@ -85,7 +85,7 @@ void RenderSeriesList(App &main_app) {
     if (ImGui::Button("Scan contents of all folders")) {
         for (auto &folder: main_app.m_folders) {
             main_app.queue_async_call([&folder](int pid) {
-                folder.update_state_from_cache();
+                folder->update_state_from_cache();
             });
         }
     }
@@ -125,13 +125,13 @@ void RenderSeriesList(App &main_app) {
 
         int folder_id = 0;
         for (auto &folder: main_app.m_folders) {
-            auto folder_name = folder.m_path.filename().string();
+            auto folder_name = folder->m_path.filename().string();
 
-            const auto status_info = GetFolderStatusCharacter(folder.m_status);
+            const auto status_info = GetFolderStatusCharacter(folder->m_status);
 
             auto label = fmt::format("{} {}", status_info.chr, folder_name.c_str());
 
-            if ((folder.m_status & search_status_flags) == 0) {
+            if ((folder->m_status & search_status_flags) == 0) {
                 continue;
             }
 
@@ -139,7 +139,7 @@ void RenderSeriesList(App &main_app) {
                 continue;
             }
 
-            auto is_selected = main_app.m_current_folder == &folder;
+            auto is_selected = main_app.m_current_folder == folder;
     
             ImGui::PushID(folder_id++);
             ImGui::PushStyleColor(ImGuiCol_Text, status_info.color.Value);
@@ -151,9 +151,9 @@ void RenderSeriesList(App &main_app) {
             ImGui::Text(folder_name.c_str());
 
             if (selected_pressed) {
-                main_app.m_current_folder = &folder;
+                main_app.m_current_folder = folder;
                 main_app.queue_async_call([&folder](int pid) {
-                    folder.update_state_from_cache();
+                    folder->update_state_from_cache();
                 });
             }
         }
@@ -190,24 +190,22 @@ std::array<FileActionStringPair, 5> FileActionToString = {{
     { FileIntent::Action::WHITELIST, "Whitelist" },
 }};
 
-static void RenderFileIntentChange(SeriesFolder &folder, FileIntent &intent, const char *label) {
-    auto &state = folder.m_state;
+static void RenderFileIntentChange(SeriesFolder &folder, ManagedFileIntent &intent, const char *label) {
     if (ImGui::BeginPopup(label)) {
         if (ImGui::Selectable("Open folder")) {
-            folder.open_folder(intent.src);
+            folder.open_folder(intent.GetSrc());
         }
         if (ImGui::Selectable("Open file")) {
-            folder.open_file(intent.src);
+            folder.open_file(intent.GetSrc());
         }
 
         ImGui::Separator();
 
         for (auto &p: FileActionToString) {
-            if ((intent.action != p.action) 
-                && ImGui::Selectable(p.str, false, 0)) 
+            if ((intent.GetAction() != p.action) && ImGui::Selectable(p.str, false, 0)) 
             {
-                state.OnIntentUpdate(intent, p.action);
-                state.OnIntentUpdate(intent, false);
+                intent.SetAction(p.action);
+                intent.SetIsActive(false);
                 ImGui::CloseCurrentPopup();
             }
         }
@@ -258,8 +256,7 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
     // render the state tree
     std::scoped_lock state_lock(folder.m_state_mutex);
     auto &state = folder.m_state;
-    auto &counts = state.action_counts;
-    state.UpdateConflictTable();
+    auto &counts = state->GetActionCount();
 
     bool show_tab_bar = ImGui::BeginTabBar("##file intent tab group");
 
@@ -275,7 +272,7 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
         ImGui::EndTabItem();
     }
 
-    tab_name = fmt::format("Conflicts {:d}###conflict tab", state.conflicts.size());
+    tab_name = fmt::format("Conflicts {:d}###conflict tab", state->GetConflicts().size());
     if (ImGui::BeginTabItem(tab_name.c_str())) {
         RenderFilesConflict(folder);
         ImGui::EndTabItem();
@@ -313,14 +310,14 @@ static void RenderEpisodesGenericList(SeriesFolder &folder, const char *table_id
         ImGui::TableHeadersRow();
 
         int i = 0;
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != action) continue; 
+        for (auto &[key, intent]: state->GetIntents()) {
+            if (intent.GetAction() != action) continue; 
 
             ImGui::TableNextRow();
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
             const char *popup_key = "##intent action popup";
-            if (ImGui::Selectable(intent.src.c_str())) {
+            if (ImGui::Selectable(intent.GetSrc().c_str())) {
                 ImGui::OpenPopup(popup_key);
             }
             RenderFileIntentChange(folder, intent, popup_key);
@@ -345,16 +342,16 @@ void RenderFilesWhitelist(SeriesFolder &folder) {
 void RenderFilesRename(SeriesFolder &folder) {
     auto &state = folder.m_state;
     if (ImGui::Button("Select all")) {
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::RENAME) continue; 
-            state.OnIntentUpdate(intent, true);
+        for (auto &[key, intent]: state->GetIntents()) {
+            if (intent.GetAction() != FileIntent::Action::RENAME) continue; 
+            intent.SetIsActive(true);
         }
     }
     ImGui::SameLine();
     if (ImGui::Button("Clear all")) {
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::RENAME) continue; 
-            state.OnIntentUpdate(intent, false);
+        for (auto &[key, intent]: state->GetIntents()) {
+            if (intent.GetAction() != FileIntent::Action::RENAME) continue; 
+            intent.SetIsActive(false);
         }
     }
     ImGui::Separator();
@@ -367,24 +364,24 @@ void RenderFilesRename(SeriesFolder &folder) {
         ImGui::TableHeadersRow();
 
         int row_id  = 0;
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::RENAME) continue; 
+        for (auto &[key, intent]: state->GetIntents()) {
+            if (intent.GetAction() != FileIntent::Action::RENAME) continue; 
 
             ImGui::PushID(row_id++);
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            bool is_active_copy = intent.is_active;
+            bool is_active_copy = intent.GetIsActive();
             if (ImGui::Checkbox("##intent_checkbox", &is_active_copy)) {
-                state.OnIntentUpdate(intent, is_active_copy);
+                intent.SetIsActive(is_active_copy);
             }
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::TextWrapped(intent.src.c_str());
+            ImGui::TextWrapped(intent.GetSrc().c_str());
             ImGui::TableSetColumnIndex(2);
 
             ImGui::PushItemWidth(-1.0f);
-            if (ImGui::InputText("###dest path", &intent.dest)) {
-                state.is_conflict_table_dirty = true;
+            if (ImGui::InputText("###dest path", &intent.GetDest())) {
+                intent.OnDestChange();
             }
             ImGui::PopItemWidth();
 
@@ -406,16 +403,16 @@ void RenderFilesDelete(SeriesFolder &folder) {
     auto &state = folder.m_state;
 
     if (ImGui::Button("Select all")) {
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::DELETE) continue; 
-            state.OnIntentUpdate(intent, true);
+        for (auto &[key, intent]: state->GetIntents()) {
+            if (intent.GetAction() != FileIntent::Action::DELETE) continue; 
+            intent.SetIsActive(true);
         }
     }
     ImGui::SameLine();
     if (ImGui::Button("Clear all")) {
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::DELETE) continue; 
-            state.OnIntentUpdate(intent, false);
+        for (auto &[key, intent]: state->GetIntents()) {
+            if (intent.GetAction() != FileIntent::Action::DELETE) continue; 
+            intent.SetIsActive(false);
         }
     }
     ImGui::Separator();
@@ -427,20 +424,20 @@ void RenderFilesDelete(SeriesFolder &folder) {
         ImGui::TableHeadersRow();
 
         int i = 0;
-        for (auto &[key, intent]: state.intents) {
-            if (intent.action != FileIntent::Action::DELETE) continue; 
+        for (auto &[key, intent]: state->GetIntents()) {
+            if (intent.GetAction() != FileIntent::Action::DELETE) continue; 
             ImGui::TableNextRow();
 
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
 
-            bool is_active_copy = intent.is_active;
+            bool is_active_copy = intent.GetIsActive();
             if (ImGui::Checkbox("##active checkbox", &is_active_copy)) {
-                state.OnIntentUpdate(intent, is_active_copy);
+                intent.SetIsActive(is_active_copy);
             }
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::TextWrapped(intent.src.c_str());
+            ImGui::TextWrapped(intent.GetSrc().c_str());
             ImGui::SameLine();
 
             const char *popup_id = "##intent action popup";
@@ -457,8 +454,7 @@ void RenderFilesDelete(SeriesFolder &folder) {
 
 void RenderFilesConflict(SeriesFolder &folder) {
     auto &state = folder.m_state;
-    state.UpdateConflictTable();
-    auto &conflicts = state.conflicts;
+    auto &conflicts = state->GetConflicts();
 
     ImGui::BeginChild("Conflict tab");
 
@@ -479,32 +475,36 @@ void RenderFilesConflict(SeriesFolder &folder) {
             ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableHeadersRow();
 
+            auto &intents = state->GetIntents();
             for (auto &key: targets) {
-                auto &intent = state.intents[key];
+                if (!intents.contains(key)) {
+                    continue;
+                }
+                auto &intent = intents.at(key);
                 ImGui::PushID(src_id++);
 
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
 
-                if (intent.action == FileIntent::Action::RENAME) {
-                    bool is_active_copy = intent.is_active;
+                if (intent.GetAction() == FileIntent::Action::RENAME) {
+                    bool is_active_copy = intent.GetIsActive();
                     if (ImGui::Checkbox("##active_check", &is_active_copy)) {
-                        state.OnIntentUpdate(intent, is_active_copy);
+                        intent.SetIsActive(is_active_copy);
                     }
                 }
 
                 ImGui::TableSetColumnIndex(1);
-                ImGui::TextWrapped("%s", intent.src.c_str());
+                ImGui::TextWrapped("%s", intent.GetSrc().c_str());
 
                 ImGui::TableSetColumnIndex(2);
-                if (intent.action == FileIntent::Action::RENAME) {
+                if (intent.GetAction() == FileIntent::Action::RENAME) {
                     ImGui::PushItemWidth(-1.0f);
-                    if (ImGui::InputText("###dest path", &intent.dest)) {
-                        state.is_conflict_table_dirty = true;
+                    if (ImGui::InputText("###dest path", &intent.GetDest())) {
+                        intent.OnDestChange();
                     }
                     ImGui::PopItemWidth();
                 } else {
-                    ImGui::TextWrapped("%s", intent.dest.c_str());
+                    ImGui::TextWrapped("%s", intent.GetDest().c_str());
                 }
 
                 auto popup_label = fmt::format("##action popup {}", src_id);
