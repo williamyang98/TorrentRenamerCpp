@@ -1,7 +1,7 @@
 #include <regex>
-#include <optional>
 #include <string>
 #include <array>
+#include <optional>
 
 #include "se_regex.h"
 #include "Instrumentor.h"

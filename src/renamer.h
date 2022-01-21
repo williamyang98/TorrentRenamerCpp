@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include "folder_diff.h"
 
 namespace app 
 {

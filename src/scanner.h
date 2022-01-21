@@ -2,10 +2,7 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
-#include <map>
 #include <filesystem>
-#include <list>
 
 #include "file_loading.h"
 #include "folder_diff.h"

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <string>
 #include <optional>
 #include <vector>
+
 #include <rapidjson/document.h>
 
 namespace tvdb_api 

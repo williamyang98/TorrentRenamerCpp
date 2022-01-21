@@ -1,15 +1,13 @@
-#include <cpr/cpr.h>
 #include <fstream>
 #include <string>
+#include <vector>
+#include <optional>
 
-#include <rapidjson/reader.h>
+#include <cpr/cpr.h>
 #include <rapidjson/writer.h>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/schema.h>
-
-#include <vector>
-#include <optional>
 
 #include <fmt/core.h>
 #include <spdlog/spdlog.h>

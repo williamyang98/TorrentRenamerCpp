@@ -1,10 +1,10 @@
 #include <vector>
 #include <filesystem>
 #include <string>
-#include <fmt/core.h>
 #include <sstream>
-#include <iterator>
 #include <ranges>
+
+#include <fmt/core.h>
 
 #include "Instrumentor.h"
 #include "console_colours.h"

@@ -21,6 +21,8 @@ struct SEMatch {
 #define EXT_PATTERN  "\\.([a-zA-Z0-9]+)"
 #define TOTAL_PATTERNS 4
 
+// NOTE: this might break if we have this in more than one compilation since it
+// could break the one defintion rule. Just change this to an extern and instantiate in a cpp file
 constexpr std::array<const char *, TOTAL_PATTERNS> SE_PATTERNS {
     TITLE_PATTERN "[Ss](\\d+)\\s*[Ee](\\d+)(.*)" EXT_PATTERN,
     TITLE_PATTERN "[Ss]eason\\s*(\\d+)\\s*[Ee]pisode\\s*(\\d+)(.*)" EXT_PATTERN,

@@ -30,6 +30,7 @@ struct FileIntent {
 
 class ManagedFileIntent;
 
+// use maps so when we iterate over them in the ui the order is maintained alphabetically
 // file table
 typedef std::map<std::string, ManagedFileIntent> FileTable;
 // conflict table (store keys into our file table)

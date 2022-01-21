@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <mutex>
+#include <array>
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -8,8 +9,6 @@
 
 #include "gui_ext.h"
 #include "font_awesome_definitions.h"
-
-#include <array>
 
 namespace app::gui 
 {

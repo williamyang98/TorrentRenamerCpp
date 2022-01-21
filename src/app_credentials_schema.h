@@ -1,6 +1,5 @@
 #pragma once
 
-#include <rapidjson/document.h>
 #include <rapidjson/schema.h>
 
 namespace app {

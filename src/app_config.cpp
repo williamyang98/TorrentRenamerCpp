@@ -1,5 +1,4 @@
 #include <rapidjson/document.h>
-#include <rapidjson/reader.h>
 #include <rapidjson/schema.h>
 
 #include <spdlog/spdlog.h>
