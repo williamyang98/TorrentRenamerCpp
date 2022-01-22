@@ -8,7 +8,26 @@
 
 namespace app {
 
+#define TITLE_PATTERN  "([a-zA-Z\\.\\s\\-]*)[^a-zA-Z\\.\\s\\-]*"
+#define EXT_PATTERN  "\\.([a-zA-Z0-9]+)"
+#define TOTAL_PATTERNS 4
+
 const std::regex TAG_REGEX("[\\[\\(]([a-zA-Z0-9]{2,})[\\]\\)]");
+
+constexpr std::array<const char *, TOTAL_PATTERNS> SE_PATTERNS {
+    TITLE_PATTERN "[Ss](\\d+)\\s*[Ee](\\d+)(.*)" EXT_PATTERN,
+    TITLE_PATTERN "[Ss]eason\\s*(\\d+)\\s*[Ee]pisode\\s*(\\d+)(.*)" EXT_PATTERN,
+    TITLE_PATTERN "(\\d+)\\s*x\\s*(\\d+)(.*)" EXT_PATTERN,
+    TITLE_PATTERN "[^\\w]+(\\d)(\\d\\d)[^\\w]+(.*)" EXT_PATTERN,
+};
+
+extern const std::vector<std::regex> SE_REGEXES = []() {
+    std::vector<std::regex> regexes;
+    for (const auto &pattern: SE_PATTERNS) {
+        regexes.push_back(std::regex(pattern));
+    }
+    return regexes;
+} ();
 
 static std::vector<std::string> find_tags(const std::string &str_in) {
     std::vector<std::string> tags;

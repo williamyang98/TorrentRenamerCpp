@@ -64,6 +64,9 @@ struct TVDB_Cache {
     EpisodesMap episodes;
 };
 
+// load schema from a buffer
+rapidjson::SchemaDocument load_schema_from_cstr(const char *cstr);
+
 // load data from json documents
 SeriesInfo load_series_info(const rapidjson::Document &doc);
 EpisodesMap load_series_episodes_info(const rapidjson::Document &doc);

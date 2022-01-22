@@ -13,6 +13,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/schema.h>
+#include <rapidjson/error/en.h>
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
@@ -20,6 +21,22 @@
 #include "file_loading.h"
 
 namespace app {
+
+rapidjson::SchemaDocument load_schema_from_cstr(const char *cstr) {
+    rapidjson::Document doc;
+    rapidjson::ParseResult ok = doc.Parse(cstr);
+    if (!ok) {
+        spdlog::critical(fmt::format("JSON parse error: {} ({})\n", 
+            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+        #ifndef NDEBUG
+        assert(!ok.IsError());
+        #else
+        exit(EXIT_FAILURE);
+        #endif
+    }
+    auto schema = rapidjson::SchemaDocument(doc);
+    return schema;
+}
 
 // for all loading checks, refer to the schema file (schema.json) for structure of document
 SeriesInfo load_series_info(const rapidjson::Document &doc) {
@@ -114,7 +131,12 @@ DocumentLoadResult load_document_from_file(const char *fn) {
     file.close();
 
     rapidjson::Document doc;
-    doc.Parse(ss.str().c_str());
+    rapidjson::ParseResult ok = doc.Parse(ss.str().c_str());
+    if (!ok) {
+        spdlog::error(fmt::format("JSON parse error: {} ({})", 
+            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+        return {};
+    }
 
     res.code = DocumentLoadCode::OK;
     res.doc = std::move(doc);

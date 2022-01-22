@@ -4,7 +4,6 @@
 
 namespace app {
 
-extern const char *CREDENTIALS_SCHEMA_STR;
 extern rapidjson::SchemaDocument CREDENTIALS_SCHEMA;
 
 }

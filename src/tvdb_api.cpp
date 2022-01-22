@@ -8,6 +8,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/schema.h>
+#include <rapidjson/error/en.h>
 
 #include <fmt/core.h>
 #include <spdlog/spdlog.h>
@@ -68,7 +69,14 @@ std::optional<std::string> login(const char *apikey, const char *userkey, const 
     }
 
     rapidjson::Document doc;
-    doc.Parse(r.text.c_str());
+    rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
+    if (ok.IsError()) {
+        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
+        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
+            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+        return {};
+    }
+
     return doc["token"].GetString();
 }
 
@@ -93,7 +101,14 @@ std::optional<rapidjson::Document> search_series(const char *name, const char *t
     }
 
     rapidjson::Document doc;
-    doc.Parse(r.text.c_str());
+    rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
+    if (ok.IsError()) {
+        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
+        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
+            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+        return {};
+    }
+
     doc.Swap(doc["data"]);
     validate_response(doc, SEARCH_DATA_SCHEMA);
     return doc;
@@ -110,7 +125,14 @@ std::optional<rapidjson::Document> get_series(sid_t id, const char *token) {
     }
 
     rapidjson::Document doc;
-    doc.Parse(r.text.c_str());
+    rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
+    if (ok.IsError()) {
+        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
+        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
+            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+        return {};
+    }
+
     doc.Swap(doc["data"]);
     validate_response(doc, SERIES_DATA_SCHEMA);
     return doc;
@@ -144,7 +166,13 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     };
 
     rapidjson::Document doc;
-    doc.Parse(r.text.c_str());
+    rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
+    if (ok.IsError()) {
+        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
+        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
+            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+        return {};
+    }
     add_episodes(doc);
     
     auto &links = doc["links"];
@@ -163,7 +191,14 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
         }
 
         rapidjson::Document doc0;
-        doc0.Parse(r0.text.c_str());
+        // if this page was in an invalid json format, we just ignore it
+        ok = doc0.Parse(r0.text.c_str());
+        if (ok.IsError()) {
+            spdlog::warn(fmt::format("Got invalid json response for {}", r0.url.c_str()));
+            spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
+                rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
+            continue;
+        }
         add_episodes(doc0);
     }
     

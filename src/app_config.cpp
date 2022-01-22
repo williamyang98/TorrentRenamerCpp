@@ -11,49 +11,42 @@ namespace app {
 
 const char *APP_CONFIG_SCHEMA = 
 R"({
-    'title': 'app config',
-    'descripton': 'Config file for gui app',
-    'type': 'object',
-    'properties': {
-        'credentials_file': {
-            'type': 'string'
+    "title": "app config",
+    "descripton": "Config file for gui app",
+    "type": "object",
+    "properties": {
+        "credentials_file": {
+            "type": "string"
         },
-        'schema_file': {
-            'type': 'string'
-        },
-        'whitelist_folders': {
-            'type': 'array',
-            'items': {
-                'type': 'string'
+        "whitelist_folders": {
+            "type": "array",
+            "items": {
+                "type": "string"
             }
         },
-        'whitelist_filenames': {
-            'type': 'array',
-            'items': {
-                'type': 'string'
+        "whitelist_filenames": {
+            "type": "array",
+            "items": {
+                "type": "string"
             }
         },
-        'blacklist_extensions': {
-            'type': 'array',
-            'items': {
-                'type': 'string'
+        "blacklist_extensions": {
+            "type": "array",
+            "items": {
+                "type": "string"
             }
         },
-        'whitelist_tags': {
-            'type': 'array',
-            'items': {
-                'type': 'string'
+        "whitelist_tags": {
+            "type": "array",
+            "items": {
+                "type": "string"
             }
         }
     },
-    'required': ['credentials_file', 'schema_file']
+    "required": ["credentials_file"]
 })";
 
-rapidjson::SchemaDocument APP_SCHEMA_DOC = []() {
-    rapidjson::Document schema_doc;
-    schema_doc.Parse(APP_CONFIG_SCHEMA);
-    return rapidjson::SchemaDocument(schema_doc);
-} ();
+extern rapidjson::SchemaDocument APP_SCHEMA_DOC = load_schema_from_cstr(APP_CONFIG_SCHEMA);
 
 AppConfig load_app_config_from_filepath(const char *filename) {
     auto load_result = load_document_from_file(filename);

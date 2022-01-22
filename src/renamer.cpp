@@ -12,7 +12,6 @@ namespace fs = std::filesystem;
 
 template <typename T>
 bool rename_series_directory(const fs::path &root, T &intents) {
-    // TODO: Add checking and error handling for invalid states
     bool all_success = true;
 
     for (FileIntent &intent: intents) {
