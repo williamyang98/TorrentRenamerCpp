@@ -128,8 +128,6 @@ void RenderSeriesList(App &main_app) {
 
             const auto status_info = GetFolderStatusCharacter(folder->m_status);
 
-            auto label = fmt::format("{} {}", status_info.chr, folder_name.c_str());
-
             if ((folder->m_status & search_status_flags) == 0) {
                 continue;
             }

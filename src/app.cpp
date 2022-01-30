@@ -251,8 +251,11 @@ void SeriesFolder::open_file(const std::string &path) {
 }
 
 App::App(const char *config_filepath)
-: m_thread_pool(std::thread::hardware_concurrency()) 
 {
+    // const int num_threads = std::thread::hardware_concurrency();
+    const int num_threads = 1000;
+    m_thread_pool.resize(num_threads);
+
     m_current_folder = nullptr;
     m_global_busy_count = 0;
 
