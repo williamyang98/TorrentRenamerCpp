@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(TorrentRenamer)
 
+list(APPEND VCPKG_FEATURE_FLAGS "versions")
 
 find_package(cpr CONFIG REQUIRED)
 find_package(RapidJSON CONFIG REQUIRED)
