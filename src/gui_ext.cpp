@@ -14,10 +14,9 @@ namespace app::gui
 {
 
 static void RenderSeriesList(App &main_app);
-
-static void RenderSeriesFolder(App &main_app, SeriesFolder &folder);
-static void RenderEpisodes(App &main_app, SeriesFolder &folder);
-static void RenderInfoPanel(App &main_app, SeriesFolder &folder);
+static void RenderEpisodes(App &main_app);
+static void RenderCacheInfo(App &main_app);
+static void RenderErrors(App &main_app);
 
 static void RenderFilesComplete(SeriesFolder &folder);
 static void RenderFilesIgnore(SeriesFolder &folder);
@@ -26,8 +25,6 @@ static void RenderFilesDelete(SeriesFolder &folder);
 static void RenderFilesConflict(SeriesFolder &folder);
 static void RenderFilesWhitelist(SeriesFolder &folder);
 
-static void RenderCacheInfo(App &main_app, SeriesFolder &folder);
-static void RenderErrors(App &main_app, SeriesFolder &folder);
 
 static void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder);
 
@@ -39,13 +36,16 @@ void RenderApp(App &main_app) {
     RenderSeriesList(main_app);
     ImGui::End();
 
-    
-    ImGui::Begin("Series folder");
-    if (main_app.m_current_folder != nullptr) {
-        RenderSeriesFolder(main_app, *(main_app.m_current_folder));
-    } else {
-        ImGui::Text("Select a series");
-    }
+    ImGui::Begin("Episodes panel");
+    RenderEpisodes(main_app);
+    ImGui::End();
+
+    ImGui::Begin("Info panel");
+    RenderCacheInfo(main_app);
+    ImGui::End();
+
+    ImGui::Begin("Errors");
+    RenderErrors(main_app);
     ImGui::End();
 
     RenderAppErrors(main_app);
@@ -159,19 +159,6 @@ void RenderSeriesList(App &main_app) {
 }
 
 void RenderSeriesFolder(App &main_app, SeriesFolder &folder) {
-    ImGuiWindowFlags window_flags = 0;
-
-    float alpha = 0.7f;
-
-    ImGui::BeginChild("Episodes panel", ImVec2(ImGui::GetContentRegionAvail().x*alpha, 0), true, window_flags);
-        RenderEpisodes(main_app, folder);
-    ImGui::EndChild();
-    ImGui::SameLine();
-
-    ImGui::BeginChild("Info panel", ImVec2(0, 0), true, window_flags);
-    RenderInfoPanel(main_app, folder);
-    ImGui::EndChild();
-
 }
 
 struct FileActionStringPair {
@@ -210,7 +197,13 @@ static void RenderFileIntentChange(SeriesFolder &folder, ManagedFileIntent &inte
     }
 }
 
-void RenderEpisodes(App &main_app, SeriesFolder &folder) {
+void RenderEpisodes(App &main_app) {
+    if (main_app.m_current_folder == nullptr) {
+        ImGui::Text("Please select a series");
+        return;
+    }
+
+    auto &folder = *main_app.m_current_folder;
     bool is_busy = folder.m_is_busy;
 
     ImGui::BeginDisabled(is_busy);
@@ -250,6 +243,8 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
 
     ImGui::EndDisabled();
 
+    ImGui::Separator();
+
     // render the state tree
     std::scoped_lock state_lock(folder.m_state_mutex);
     auto &state = folder.m_state;
@@ -259,37 +254,49 @@ void RenderEpisodes(App &main_app, SeriesFolder &folder) {
 
     auto tab_name = fmt::format("Completed {:d}###completed tab", counts.completes);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
+        ImGui::BeginChild("##complete tab");
         RenderFilesComplete(folder);
+        ImGui::EndChild();
         ImGui::EndTabItem();
     }
 
     tab_name = fmt::format("Pending {:d}###pending tab", counts.renames);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
+        ImGui::BeginChild("##pending tab");
         RenderFilesRename(folder);
+        ImGui::EndChild();
         ImGui::EndTabItem();
     }
 
     tab_name = fmt::format("Conflicts {:d}###conflict tab", state->GetConflicts().size());
     if (ImGui::BeginTabItem(tab_name.c_str())) {
+        ImGui::BeginChild("##conflict tab");
         RenderFilesConflict(folder);
+        ImGui::EndChild();
         ImGui::EndTabItem();
     }
 
     tab_name = fmt::format("Deletes {:d}###delete tab", counts.deletes);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
+        ImGui::BeginChild("##delete tab");
         RenderFilesDelete(folder);
+        ImGui::EndChild();
         ImGui::EndTabItem();
     }
 
     tab_name = fmt::format("Ignores {:d}###ignore tab", counts.ignores);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
+        ImGui::BeginChild("##ignore tab");
         RenderFilesIgnore(folder);
+        ImGui::EndChild();
         ImGui::EndTabItem();
     }
 
-    tab_name = fmt::format("Whitelists {:d}###whitelsit tab", counts.whitelists);
+    tab_name = fmt::format("Whitelists {:d}###whitelist tab", counts.whitelists);
     if (ImGui::BeginTabItem(tab_name.c_str())) {
+        ImGui::BeginChild("##whitelist tab");
         RenderFilesWhitelist(folder);
+        ImGui::EndChild();
         ImGui::EndTabItem();
     }
 
@@ -524,13 +531,12 @@ void RenderFilesConflict(SeriesFolder &folder) {
     ImGui::EndChild();
 }
 
-void RenderInfoPanel(App &main_app, SeriesFolder &folder) {
-    RenderCacheInfo(main_app, folder);
-    ImGui::Separator();
-    RenderErrors(main_app, folder);
-}
+void RenderCacheInfo(App &main_app) {
+    if (main_app.m_current_folder == nullptr) {
+        return;
+    }
 
-void RenderCacheInfo(App &main_app, SeriesFolder &folder) {
+    auto &folder = *main_app.m_current_folder;
     std::scoped_lock cache_lock(folder.m_cache_mutex);
     const auto &cache = folder.m_cache;
     const auto &is_cached = folder.m_is_info_cached;
@@ -578,7 +584,12 @@ void RenderCacheInfo(App &main_app, SeriesFolder &folder) {
     }
 }
 
-void RenderErrors(App &main_app, SeriesFolder &folder) {
+void RenderErrors(App &main_app) {
+    if (main_app.m_current_folder == nullptr) {
+        return;
+    }
+
+    auto &folder = *main_app.m_current_folder;
     std::scoped_lock errors_lock(folder.m_errors_mutex);
     auto &errors = folder.m_errors;
 

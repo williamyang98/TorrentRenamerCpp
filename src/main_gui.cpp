@@ -145,14 +145,6 @@ int run(const char *root_path) {
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != NULL);
 
-    // Our state
-    #ifdef NDEBUG
-    // TODO: enable dock space without demo window
-    bool show_demo_window = true;
-    #else
-    bool show_demo_window = true;
-    #endif
-
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // create app after setting up the dx11 context
@@ -186,10 +178,8 @@ int run(const char *root_path) {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window) {
-            ImGui::ShowDemoWindow();
-        }
+        // create our dock space
+        ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
         // render our app
         app::gui::RenderApp(main_app);
