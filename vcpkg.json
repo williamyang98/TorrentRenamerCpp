@@ -18,11 +18,6 @@
     {
       "name": "spdlog",
       "version>=": "1.9.2"
-    },
-    {
-      "name": "imgui",
-      "version>=": "1.86",
-      "features": ["glfw-binding", "opengl3-binding"]
     }
   ]
 }

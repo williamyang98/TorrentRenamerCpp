@@ -6,8 +6,15 @@ list(APPEND VCPKG_FEATURE_FLAGS "versions")
 find_package(cpr CONFIG REQUIRED)
 find_package(RapidJSON CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+
+set(VENDOR_DIR ${CMAKE_SOURCE_DIR}/vendor)
+set(imgui_docking_DIR ${VENDOR_DIR}/imgui_docking)
+find_package(imgui_docking CONFIG REQUIRED)
+
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
 
 set(SRC_FILES 
     src/app_credentials_schema.cpp
@@ -26,6 +33,7 @@ include_directories(cli_test src/)
 
 set(GUI_FILES
     src/app.cpp
+    src/app_folder.cpp
     src/app_config.cpp
     src/gui_ext.cpp)
 
@@ -37,5 +45,7 @@ target_link_libraries(cli_test PRIVATE cpr::cpr rapidjson fmt::fmt spdlog::spdlo
 target_compile_options(cli_test PRIVATE "/MP")
 
 set_target_properties(main PROPERTIES CXX_STANDARD 20)
-target_link_libraries(main PRIVATE cpr::cpr rapidjson fmt::fmt imgui::imgui spdlog::spdlog spdlog::spdlog_header_only opengl32)
+target_link_libraries(main PRIVATE 
+    cpr::cpr rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only 
+    imgui_docking "d3d11.lib" "dxgi.lib" "d3dcompiler.lib")
 target_compile_options(main PRIVATE "/MP")

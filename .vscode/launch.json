@@ -5,20 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "CMake Target",
+            "name": "Main (dbg)",
             "type": "cppvsdbg",
             "request": "launch",
             // Resolved by CMake Tools:
-            "program": "${command:cmake.launchTargetPath}",
-            "args": [],
+            "program": "${workspaceFolder}/build/Debug/main.exe",
+            "args": ["E:/TV Shows"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [
-                {
-                    "name": "PATH",
-                    "value": "$PATH:${command:cmake.launchTargetDirectory}"
-                },
-            ],
             "externalConsole": true,
             "MIMode": "gdb",
             "setupCommands": [
@@ -30,12 +24,12 @@
             ]
         },
         {
-            "name": "Main",
+            "name": "Main (reldbg)",
             "type": "cppvsdbg",
             "request": "launch",
             // Resolved by CMake Tools:
-            "program": "${workspaceFolder}/build/Debug/main.exe",
-            "args": ["./tests/"],
+            "program": "${workspaceFolder}/build/RelWithDebInfo/main.exe",
+            "args": ["E:/TV Shows"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "externalConsole": true,
