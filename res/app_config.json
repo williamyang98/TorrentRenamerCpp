@@ -1,6 +1,5 @@
 {
-    "credentials_file": "credentials.json",
-    "schema_file": "schema.json",
+    "credentials_file": "res/credentials.json",
     "whitelist_folders": [
         "Extras"
     ],

@@ -30,6 +30,24 @@ static void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder);
 
 static void RenderAppErrors(App &main_app);
 
+struct {
+    ImGuiTextFilter completes;
+    ImGuiTextFilter ignores;
+    ImGuiTextFilter renames;
+    ImGuiTextFilter deletes;
+    ImGuiTextFilter conflicts;
+    ImGuiTextFilter whitelists;
+
+    void ClearAll() {
+        completes.Clear();
+        ignores.Clear();
+        renames.Clear();
+        deletes.Clear();
+        conflicts.Clear();
+        whitelists.Clear();
+    }
+} CategoryFilters;
+
 
 void RenderApp(App &main_app) {
     ImGui::Begin("Series");
@@ -202,6 +220,13 @@ void RenderEpisodes(App &main_app) {
         ImGui::Text("Please select a series");
         return;
     }
+    
+    // if the selected folder changed, we reset the filters
+    static SeriesFolder *prev_folder = nullptr;
+    if (prev_folder != main_app.m_current_folder.get()) {
+        CategoryFilters.ClearAll();
+    }
+    prev_folder = main_app.m_current_folder.get();
 
     auto &folder = *main_app.m_current_folder;
     bool is_busy = folder.m_is_busy;
@@ -306,8 +331,16 @@ void RenderEpisodes(App &main_app) {
 
 }
 
-static void RenderEpisodesGenericList(SeriesFolder &folder, const char *table_id, FileIntent::Action action) {
+static void RenderEpisodesGenericList(
+        SeriesFolder &folder, const char *table_id, FileIntent::Action action, 
+        ImGuiTextFilter &search_filter) 
+{
+    search_filter.Draw();
+
     auto &state = folder.m_state;
+    
+    ImGui::BeginChild("##intent_table");
+
     ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
     if (ImGui::BeginTable(table_id, 1, flags)) {
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
@@ -316,12 +349,16 @@ static void RenderEpisodesGenericList(SeriesFolder &folder, const char *table_id
         int i = 0;
         for (auto &[key, intent]: state->GetIntents()) {
             if (intent.GetAction() != action) continue; 
+            const char *name = intent.GetSrc().c_str(); 
+            if (!search_filter.PassFilter(name)) {
+                continue;
+            }
 
             ImGui::TableNextRow();
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
             const char *popup_key = "##intent action popup";
-            if (ImGui::Selectable(intent.GetSrc().c_str())) {
+            if (ImGui::Selectable(name)) {
                 ImGui::OpenPopup(popup_key);
             }
             RenderFileIntentChange(folder, intent, popup_key);
@@ -329,18 +366,26 @@ static void RenderEpisodesGenericList(SeriesFolder &folder, const char *table_id
         }
         ImGui::EndTable();
     }
+
+    ImGui::EndChild();
 }
 
 void RenderFilesComplete(SeriesFolder &folder) {
-    RenderEpisodesGenericList(folder, "##completed table", FileIntent::Action::COMPLETE);
+    RenderEpisodesGenericList(
+            folder, "##completed table", FileIntent::Action::COMPLETE,
+            CategoryFilters.completes);
 }
 
 void RenderFilesIgnore(SeriesFolder &folder) {
-    RenderEpisodesGenericList(folder, "##ignore table", FileIntent::Action::IGNORE);
+    RenderEpisodesGenericList(
+            folder, "##ignore table", FileIntent::Action::IGNORE,
+            CategoryFilters.ignores);
 }
 
 void RenderFilesWhitelist(SeriesFolder &folder) {
-    RenderEpisodesGenericList(folder, "##whitelist table", FileIntent::Action::WHITELIST);
+    RenderEpisodesGenericList(
+            folder, "##whitelist table", FileIntent::Action::WHITELIST,
+            CategoryFilters.whitelists);
 }
 
 void RenderFilesRename(SeriesFolder &folder) {
@@ -360,6 +405,10 @@ void RenderFilesRename(SeriesFolder &folder) {
     }
     ImGui::Separator();
 
+    ImGuiTextFilter &search_filter = CategoryFilters.renames;
+    search_filter.Draw();
+    ImGui::BeginChild("##intent_table");
+
     ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
     if (ImGui::BeginTable("Pending Table", 3, flags)) {
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
@@ -371,6 +420,14 @@ void RenderFilesRename(SeriesFolder &folder) {
         for (auto &[key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::RENAME) continue; 
 
+            const char *src_name = intent.GetSrc().c_str();
+            const char *dest_name = intent.GetDest().c_str();
+            if (!search_filter.PassFilter(src_name) &&
+                !search_filter.PassFilter(dest_name))
+            {
+                continue;
+            }
+
             ImGui::PushID(row_id++);
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
@@ -380,7 +437,7 @@ void RenderFilesRename(SeriesFolder &folder) {
             }
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::TextWrapped(intent.GetSrc().c_str());
+            ImGui::TextWrapped(src_name);
             ImGui::TableSetColumnIndex(2);
 
             ImGui::PushItemWidth(-1.0f);
@@ -401,6 +458,8 @@ void RenderFilesRename(SeriesFolder &folder) {
 
         ImGui::EndTable();
     }
+
+    ImGui::EndChild();
 }
 
 void RenderFilesDelete(SeriesFolder &folder) {
@@ -421,6 +480,11 @@ void RenderFilesDelete(SeriesFolder &folder) {
     }
     ImGui::Separator();
 
+    ImGuiTextFilter &search_filter = CategoryFilters.deletes;
+    search_filter.Draw();
+
+    ImGui::BeginChild("##intent_table");
+
     ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders;
     if (ImGui::BeginTable("##delete table", 2, flags)) {
         ImGui::TableSetupColumn("##is active checkbox", ImGuiTableColumnFlags_WidthFixed);
@@ -430,6 +494,15 @@ void RenderFilesDelete(SeriesFolder &folder) {
         int i = 0;
         for (auto &[key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::DELETE) continue; 
+
+            const char *src_name = intent.GetSrc().c_str();
+            const char *dest_name = intent.GetDest().c_str();
+            if (!search_filter.PassFilter(src_name) &&
+                !search_filter.PassFilter(dest_name))
+            {
+                continue;
+            }
+
             ImGui::TableNextRow();
 
             ImGui::PushID(i++);
@@ -454,11 +527,16 @@ void RenderFilesDelete(SeriesFolder &folder) {
         }
         ImGui::EndTable();
     }
+
+    ImGui::EndChild();
 }
 
 void RenderFilesConflict(SeriesFolder &folder) {
     auto &state = folder.m_state;
     auto &conflicts = state->GetConflicts();
+
+    ImGuiTextFilter &search_filter = CategoryFilters.conflicts;
+    search_filter.Draw();
 
     ImGui::BeginChild("Conflict tab");
 
@@ -484,9 +562,13 @@ void RenderFilesConflict(SeriesFolder &folder) {
                 if (!intents.contains(key)) {
                     continue;
                 }
-                auto &intent = intents.at(key);
-                ImGui::PushID(src_id++);
 
+                auto &intent = intents.at(key);
+                if (!search_filter.PassFilter(intent.GetSrc().c_str())) {
+                    continue;
+                }
+                
+                ImGui::PushID(src_id++);
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
 

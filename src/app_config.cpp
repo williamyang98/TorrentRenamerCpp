@@ -77,7 +77,6 @@ AppConfig load_app_config_from_filepath(const char *filename) {
 
     AppConfig cfg;
     cfg.credentials_filepath = doc["credentials_file"].GetString();
-    cfg.schema_filepath = doc["schema_file"].GetString();
     cfg.blacklist_extensions = load_string_list(doc, "blacklist_extensions");
     cfg.whitelist_filenames = load_string_list(doc, "whitelist_filenames");
     cfg.whitelist_folders = load_string_list(doc, "whitelist_folders");

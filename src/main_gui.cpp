@@ -106,17 +106,21 @@ int run(const char *root_path) {
     io.ConfigFlags |= ImGuiConfigFlags_DpiEnableScaleViewports; // FIXME-DPI: Experimental.
 
     // load font
-    io.Fonts->AddFontDefault();
-    static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-    ImFontConfig icons_config; 
-    icons_config.MergeMode = true; 
-    icons_config.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF("font_awesome.ttf", 16.0f, &icons_config, icons_ranges);
+    //io.Fonts->AddFontDefault();
+
+    io.Fonts->AddFontFromFileTTF("res/Roboto-Regular.ttf", 14.0f);
+    {
+        static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+        ImFontConfig icons_config; 
+        icons_config.MergeMode = true; 
+        icons_config.PixelSnapH = true;
+        io.Fonts->AddFontFromFileTTF("res/font_awesome.ttf", 16.0f, &icons_config, icons_ranges);
+    }
 
     // Setup Dear ImGui style
     // ImGui::StyleColorsDark();
     ImGui::StyleColorsLight();
-    //ImGui::StyleColorsClassic();
+    // ImGui::StyleColorsClassic();
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
     ImGuiStyle& style = ImGui::GetStyle();
@@ -148,7 +152,7 @@ int run(const char *root_path) {
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // create app after setting up the dx11 context
-    app::App main_app("app_config.json");
+    app::App main_app("res/app_config.json");
 
     if (root_path == NULL) {
         main_app.queue_app_error("Please specify a filepath as an argument when starting the application");

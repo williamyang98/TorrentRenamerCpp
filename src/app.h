@@ -77,7 +77,6 @@ private:
 
 struct AppConfig {
     std::string credentials_filepath;
-    std::string schema_filepath;
     std::vector<std::string> whitelist_folders;
     std::vector<std::string> whitelist_filenames;
     std::vector<std::string> blacklist_extensions; 
