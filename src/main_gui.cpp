@@ -5,6 +5,7 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
+#include "imgui_config.h"
 
 #include <stdio.h>
 #include <iostream>
@@ -108,7 +109,7 @@ int run(const char *root_path) {
     // load font
     //io.Fonts->AddFontDefault();
 
-    io.Fonts->AddFontFromFileTTF("res/Roboto-Regular.ttf", 14.0f);
+    io.Fonts->AddFontFromFileTTF("res/Roboto-Regular.ttf", 15.0f);
     {
         static const ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
         ImFontConfig icons_config; 
@@ -129,6 +130,7 @@ int run(const char *root_path) {
         style.WindowRounding = 0.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
+    ImGuiSetupCustomConfig();
 
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(hwnd);
