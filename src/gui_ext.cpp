@@ -638,73 +638,72 @@ void RenderFilesConflict(SeriesFolder &folder) {
 
     ImGui::BeginChild("Conflict tab");
 
-    ImGuiTableFlags flags = 
+    const ImGuiTableFlags flags = 
         ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | 
         ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings |
         ImGuiTableFlags_SizingStretchProp;
-
-    int src_id = 0;
+    
     for (auto &[dest, targets]: conflicts) {
         auto tree_label = fmt::format("{} ({:d})", dest.c_str(), targets.size());
+        if (ImGui::CollapsingHeader(tree_label.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (ImGui::BeginTable("##conflict_table", 3, flags)) {
 
-        bool is_open = ImGui::CollapsingHeader(tree_label.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-        if (is_open && ImGui::BeginTable("##conflict table", 3, flags)) {
+                ImGui::TableSetupColumn("##active_checkbox_column", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableHeadersRow();
 
-            ImGui::TableSetupColumn("##active checkbox column", ImGuiTableColumnFlags_WidthFixed);
-            ImGui::TableSetupColumn("Target", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableHeadersRow();
-
-            auto &intents = state->GetIntents();
-            for (auto &key: targets) {
-                if (!intents.contains(key)) {
-                    continue;
-                }
-
-                auto &intent = intents.at(key);
-                if (!search_filter.PassFilter(intent.GetSrc().c_str())) {
-                    continue;
-                }
-                
-                ImGui::PushID(src_id++);
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-
-                if (intent.GetAction() == FileIntent::Action::RENAME) {
-                    bool is_active_copy = intent.GetIsActive();
-                    if (ImGui::Checkbox("##active_check", &is_active_copy)) {
-                        intent.SetIsActive(is_active_copy);
+                auto &intents = state->GetIntents();
+                ImGui::PushID(dest.c_str());
+                for (auto &key: targets) {
+                    if (!intents.contains(key)) {
+                        continue;
                     }
-                }
 
-                ImGui::TableSetColumnIndex(1);
-                ImGui::TextWrapped("%s", intent.GetSrc().c_str());
-
-                ImGui::TableSetColumnIndex(2);
-                if (intent.GetAction() == FileIntent::Action::RENAME) {
-                    ImGui::PushItemWidth(-1.0f);
-                    if (ImGui::InputText("###dest path", &intent.GetDest())) {
-                        intent.OnDestChange();
+                    auto &intent = intents.at(key);
+                    if (!search_filter.PassFilter(intent.GetSrc().c_str())) {
+                        continue;
                     }
-                    ImGui::PopItemWidth();
-                } else {
-                    ImGui::TextWrapped("%s", intent.GetDest().c_str());
+                    
+                    ImGui::PushID(key.c_str());
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+
+                    if (intent.GetAction() == FileIntent::Action::RENAME) {
+                        bool is_active_copy = intent.GetIsActive();
+                        if (ImGui::Checkbox("##active_check", &is_active_copy)) {
+                            intent.SetIsActive(is_active_copy);
+                        }
+                    }
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextWrapped("%s", intent.GetSrc().c_str());
+
+                    ImGui::TableSetColumnIndex(2);
+                    if (intent.GetAction() == FileIntent::Action::RENAME) {
+                        ImGui::PushItemWidth(-1.0f);
+                        if (ImGui::InputText("###dest path", &intent.GetDest())) {
+                            intent.OnDestChange();
+                        }
+                        ImGui::PopItemWidth();
+                    } else {
+                        ImGui::TextWrapped("%s", intent.GetDest().c_str());
+                    }
+
+                    auto popup_label = fmt::format("##action popup_{}", key.c_str());
+                    ImGui::SameLine();
+                    if (ImGui::Selectable("##action popup select", false, ImGuiSelectableFlags_SpanAllColumns)) {
+                        ImGui::OpenPopup(popup_label.c_str());
+                    }
+
+                    RenderFileIntentChange(folder, intent, popup_label.c_str());
+                    ImGui::PopID();
                 }
-
-                auto popup_label = fmt::format("##action popup {}", src_id);
-                ImGui::SameLine();
-                if (ImGui::Selectable("##action popup", false, ImGuiSelectableFlags_SpanAllColumns)) {
-                    ImGui::OpenPopup(popup_label.c_str());
-                }
-
-                RenderFileIntentChange(folder, intent, popup_label.c_str());
-
                 ImGui::PopID();
+
+                ImGui::EndTable();
             }
-
-            ImGui::EndTable();
         }
-
         ImGui::Spacing();
     }
 

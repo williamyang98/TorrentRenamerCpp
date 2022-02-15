@@ -84,11 +84,13 @@ class ManagedFileIntent
 private:
     ManagedFolder &m_folder;
     FileIntent m_intent;
+    std::string m_old_dest;
 public:
     // transfer ownership of intent to managed file intent
     ManagedFileIntent(ManagedFolder &folder, FileIntent &intent)
     : m_folder(folder) {
         m_intent = std::move(intent);
+        m_old_dest = m_intent.dest;
     }
 
     FileIntent& GetUnmanagedIntent() { return m_intent; }
