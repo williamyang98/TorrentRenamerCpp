@@ -133,8 +133,13 @@ void App::queue_async_call(std::function<void (int)> call) {
 
 // mutex protected addition of error
 void App::queue_app_error(const std::string &error) {
-    std::scoped_lock lock(m_app_errors_mutex);
+    auto lock = std::scoped_lock(m_app_errors_mutex);
     m_app_errors.push_back(error);
+}
+
+void App::queue_app_warning(const std::string &warning) {
+    auto lock = std::scoped_lock(m_app_warnings_mutex);
+    m_app_warnings.push_back(warning);
 }
 
 };

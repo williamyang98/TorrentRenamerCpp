@@ -1,7 +1,9 @@
-#include <iostream>
+#include <stdio.h>
 #include <string>
 #include <mutex>
 #include <array>
+#include <filesystem>
+#include <optional>
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -10,9 +12,83 @@
 #include "gui_ext.h"
 #include "font_awesome_definitions.h"
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <tchar.h>
+#include <shobjidl.h>
+#include <shtypes.h>
+
+#pragma comment(lib, "mincore")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
+
+// get rid of conflicting windows macros
+#undef IGNORE
+#undef DELETE
+
 namespace app::gui 
 {
 
+constexpr int MAX_BUFFER_SIZE = 256;
+namespace fs = std::filesystem;
+
+std::string wide_string_to_string(const std::wstring& wide_string)
+{
+    if (wide_string.empty())
+    {
+        return "";
+    }
+
+    const auto size_needed = WideCharToMultiByte(CP_UTF8, 0, &wide_string.at(0), (int)wide_string.size(), nullptr, 0, nullptr, nullptr);
+    if (size_needed <= 0)
+    {
+        throw std::runtime_error("WideCharToMultiByte() failed: " + std::to_string(size_needed));
+    }
+
+    std::string result(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, &wide_string.at(0), (int)wide_string.size(), &result.at(0), size_needed, nullptr, nullptr);
+    return result;
+}
+
+// helper object for creating windows file dialogs
+class CoFileDialog 
+{
+public:
+    CoFileDialog() {
+        HRESULT hr = 
+            CoCreateInstance(
+                CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
+                IID_IFileOpenDialog, reinterpret_cast<void**>(&m_dialog));
+        if (!SUCCEEDED(hr)) {
+            throw std::runtime_error("Failed to create file dialog object");
+        }
+    }
+    std::optional<std::string> open() {
+        HRESULT hr;
+
+        // open the dialog
+        hr = m_dialog->Show(NULL);
+        if (!SUCCEEDED(hr)) return {};
+
+        IShellItem *pItem;
+        hr = m_dialog->GetResult(&pItem);
+        if (!SUCCEEDED(hr)) return {};
+
+        PWSTR pFilepath;
+        hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pFilepath);
+        if (!SUCCEEDED(hr)) return {};
+
+        std::wstring ws(pFilepath);
+        return wide_string_to_string(ws);
+    }   
+    inline IFileOpenDialog* operator->() const { return m_dialog; }
+private:
+    IFileOpenDialog *m_dialog;
+};
+
+// render components
 static void RenderSeriesList(App &main_app);
 static void RenderEpisodes(App &main_app);
 static void RenderCacheInfo(App &main_app);
@@ -25,11 +101,11 @@ static void RenderFilesDelete(SeriesFolder &folder);
 static void RenderFilesConflict(SeriesFolder &folder);
 static void RenderFilesWhitelist(SeriesFolder &folder);
 
-
 static void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder);
-
+static void RenderAppWarnings(App &main_app);
 static void RenderAppErrors(App &main_app);
 
+// our global filters
 struct {
     ImGuiTextFilter completes;
     ImGuiTextFilter ignores;
@@ -48,11 +124,10 @@ struct {
     }
 } CategoryFilters;
 
-
 void RenderApp(App &main_app) {
-    ImGui::Begin("Series");
+    // render out of order to get last item as default focus
+    RenderAppWarnings(main_app);
     RenderSeriesList(main_app);
-    ImGui::End();
 
     ImGui::Begin("Episodes panel");
     RenderEpisodes(main_app);
@@ -93,14 +168,38 @@ static FolderStatusCharacter GetFolderStatusCharacter(SeriesFolder::Status statu
 }
 
 void RenderSeriesList(App &main_app) {
+    auto &folders = main_app.m_folders;
+    static char LABEL_BUFFER[MAX_BUFFER_SIZE+1] = {0};
+
+    _snprintf_s(
+        LABEL_BUFFER, MAX_BUFFER_SIZE,
+        "Series (%llu)###Series", folders.size());
+    
+    ImGuiWindowFlags win_flags = ImGuiWindowFlags_MenuBar;
+    ImGui::Begin(LABEL_BUFFER, NULL, win_flags);
+
     const int busy_count = main_app.get_folder_busy_count();
     ImGui::BeginDisabled(busy_count > 0);
+    
+    if (ImGui::BeginMenuBar()) {
+        if (ImGui::MenuItem("Select folder")) {
+            auto dialog = CoFileDialog();
+            dialog->SetOptions(FOS_PICKFOLDERS);
+            auto opt = dialog.open();
+            if (opt) {
+                main_app.m_root = fs::path(std::move(opt.value()));
+                main_app.refresh_folders();
+            }
+        }
+        ImGui::EndMenuBar();
+    }
+
     if (ImGui::Button("Refresh project structure")) {
         main_app.refresh_folders();
     }
 
     if (ImGui::Button("Scan contents of all folders")) {
-        for (auto &folder: main_app.m_folders) {
+        for (auto &folder: folders) {
             main_app.queue_async_call([&folder](int pid) {
                 folder->update_state_from_cache();
             });
@@ -108,7 +207,7 @@ void RenderSeriesList(App &main_app) {
     }
     ImGui::EndDisabled();
 
-    ImGui::Text("Total busy folders (%d/%d)", busy_count, main_app.m_folders.size());
+    ImGui::Text("Total busy folders (%d/%d)", busy_count, folders.size());
 
     ImGui::Separator();
     static ImGuiTextFilter search_filter;
@@ -141,7 +240,7 @@ void RenderSeriesList(App &main_app) {
     if (ImGui::BeginListBox("##series_list_box", ImVec2(-1,-1))) {
 
         int folder_id = 0;
-        for (auto &folder: main_app.m_folders) {
+        for (auto &folder: folders) {
             auto folder_name = folder->m_path.filename().string();
 
             const auto status_info = GetFolderStatusCharacter(folder->m_status);
@@ -174,9 +273,8 @@ void RenderSeriesList(App &main_app) {
         }
         ImGui::EndListBox();
     }
-}
 
-void RenderSeriesFolder(App &main_app, SeriesFolder &folder) {
+    ImGui::End();
 }
 
 struct FileActionStringPair {
@@ -773,6 +871,43 @@ void RenderSeriesSelectModal(App &main_app, SeriesFolder &folder) {
         }
         ImGui::EndPopup();
     }
+}
+
+void RenderAppWarnings(App &main_app) {
+    auto lock = std::scoped_lock(main_app.m_app_warnings_mutex); 
+    auto &warnings = main_app.m_app_warnings;
+    static char window_name[MAX_BUFFER_SIZE+1] = {0};
+    _snprintf_s(
+            window_name, MAX_BUFFER_SIZE, 
+            "Warnings (%llu)###application warnings", warnings.size()); 
+
+    ImGui::Begin(window_name);
+    if (ImGui::BeginListBox("##Warning List", ImVec2(-1,-1))) {
+        auto it = warnings.begin();
+        auto end = warnings.end();
+
+        int gid = 0;
+        while (it != end) {
+            auto &warning = *it;
+
+            ImGui::PushID(gid++);
+
+            bool is_pressed = ImGui::Button("X");
+            ImGui::SameLine();
+            ImGui::TextWrapped(warning.c_str());
+
+            if (is_pressed) {
+                it = warnings.erase(it);
+            } else {
+                ++it;
+            }
+
+            ImGui::PopID();
+        }
+
+        ImGui::EndListBox();
+    }
+    ImGui::End();
 }
 
 void RenderAppErrors(App &main_app) {

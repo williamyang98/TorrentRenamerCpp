@@ -24,6 +24,11 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <tchar.h>
+#include <shobjidl.h>
+
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
 
 #ifdef NDEBUG
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
@@ -48,22 +53,28 @@ int run(const char *root_path);
 // Main code
 int main(int argc, char **argv)
 {
-    if (argc == 1) {
-        std::cout << "Usage: main <root_dir>" << std::endl;
-        spdlog::warn(fmt::format("Usage: main <root_dir>" ));
-        // return 1;
-    }
-
     auto logger = spdlog::basic_logger_mt("root", "logs.txt");
     spdlog::set_default_logger(logger);
 
+    #if NDEBUG
+    spdlog::set_level(spdlog::level::info);
+    #else
+    spdlog::set_level(spdlog::level::debug);
+    #endif
+
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    
+    int rv = 1;
     try {
         const char *root_path = (argc > 1) ? argv[1] : NULL;
-        return run(root_path);
+        rv = run(root_path);
     } catch (std::exception &ex) {
         spdlog::critical(fmt::format("Exception in main: {}", ex.what()));
+        rv = 1;
     }
-    return 1;
+
+    CoUninitialize();
+    return rv;
 }
 
 int run(const char *root_path) {
@@ -157,7 +168,7 @@ int run(const char *root_path) {
     app::App main_app("res/app_config.json");
 
     if (root_path == NULL) {
-        main_app.queue_app_error("Please specify a filepath as an argument when starting the application");
+        main_app.queue_app_warning("Please specify a filepath as an argument when starting the application");
     } else {
         main_app.m_root = fs::path(root_path);
         main_app.refresh_folders();

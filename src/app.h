@@ -99,6 +99,8 @@ public:
 
     std::vector<std::string> m_app_errors;
     std::mutex m_app_errors_mutex;
+    std::list<std::string> m_app_warnings;
+    std::mutex m_app_warnings_mutex;
 private:
     ctpl::thread_pool m_thread_pool;
     std::atomic<int> m_global_busy_count;
@@ -109,6 +111,7 @@ public:
     int get_folder_busy_count() { return m_global_busy_count; }
     void queue_async_call(std::function<void (int)> call);
     void queue_app_error(const std::string &error);
+    void queue_app_warning(const std::string &warning);
 };
 
 };
