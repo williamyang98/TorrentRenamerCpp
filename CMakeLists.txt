@@ -8,10 +8,7 @@ find_package(RapidJSON CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
-set(VENDOR_DIR ${CMAKE_SOURCE_DIR}/vendor)
-set(imgui_docking_DIR ${VENDOR_DIR}/imgui_docking)
-find_package(imgui_docking CONFIG REQUIRED)
-
+add_subdirectory(vendor/imgui)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
@@ -81,6 +78,6 @@ include_directories(main src/)
 set_target_properties(main PROPERTIES CXX_STANDARD 20)
 target_link_libraries(main PRIVATE 
     tvdb_api core app
-    rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only 
-    imgui_docking "d3d11.lib" "dxgi.lib" "d3dcompiler.lib")
+    rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
+target_link_libraries(main PUBLIC imgui)
 target_compile_options(main PRIVATE "/MP")
