@@ -1,3 +1,5 @@
+#include "app.h"
+
 #include <iostream>
 #include <filesystem>
 #include <string>
@@ -11,11 +13,14 @@
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
 
-#include "app.h"
 #include "app_credentials_schema.h"
-#include "tvdb_api.h"
-#include "tvdb_api_schema.h"
-#include "file_loading.h"
+#include "app_config.h"
+#include "app_folder.h"
+
+#include "tvdb_api/tvdb_api.h"
+#include "tvdb_api/tvdb_json.h"
+
+#include "util/file_loading.h"
 
 namespace app 
 {
@@ -64,17 +69,17 @@ App::App(const char *config_filepath)
 // get a new token which can be used for a few hours
 void App::authenticate() {
     auto cred_fp = m_credentials_filepath.c_str();
-    auto cred_res = load_document_from_file(cred_fp);
-    if (cred_res.code != DocumentLoadCode::OK) {
+    auto cred_res = util::load_document_from_file(cred_fp);
+    if (cred_res.code != util::DocumentLoadCode::OK) {
         auto err = "Failed to load credentials file";
         spdlog::error(err);
         queue_app_error(err);
         return;
     }
 
-    auto cred_doc = std::move(cred_res.doc);
+    auto &cred_doc = cred_res.doc;
 
-    if (!validate_document(cred_doc, CREDENTIALS_SCHEMA)) {
+    if (!util::validate_document(cred_doc, CREDENTIALS_SCHEMA)) {
         auto err = fmt::format("Credentials file is in the wrong format ({})", cred_fp);
         spdlog::error(err);
         queue_app_error(err);

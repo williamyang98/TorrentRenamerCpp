@@ -1,11 +1,12 @@
+#include "app_config.h"
+
 #include <rapidjson/document.h>
 #include <rapidjson/schema.h>
 
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
 
-#include "app.h"
-#include "file_loading.h"
+#include "util/file_loading.h"
 
 namespace app {
 
@@ -46,18 +47,18 @@ R"({
     "required": ["credentials_file"]
 })";
 
-extern rapidjson::SchemaDocument APP_SCHEMA_DOC = load_schema_from_cstr(APP_CONFIG_SCHEMA);
+extern rapidjson::SchemaDocument APP_SCHEMA_DOC = util::load_schema_from_cstr(APP_CONFIG_SCHEMA);
 
 AppConfig load_app_config_from_filepath(const char *filename) {
-    auto load_result = load_document_from_file(filename);
-    if (load_result.code != DocumentLoadCode::OK) {
+    auto load_result = util::load_document_from_file(filename);
+    if (load_result.code != util::DocumentLoadCode::OK) {
         auto err = fmt::format("Failed to load app config json from: {}", filename);
         spdlog::critical(err);
         throw std::runtime_error(err);
     }
 
     auto doc = std::move(load_result.doc);
-    if (!validate_document(doc, APP_SCHEMA_DOC)) {
+    if (!util::validate_document(doc, APP_SCHEMA_DOC)) {
         auto err = fmt::format("App config file ({}) has invalid format", filename); 
         spdlog::critical(err);
         throw std::runtime_error(err);

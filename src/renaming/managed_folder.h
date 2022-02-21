@@ -1,32 +1,20 @@
 #pragma once
 
+// wrap a list of raw file intents with management data structures
+// these include:
+// - keeping track of conflicting files
+// - counts for each file action
+
 #include <string>
-#include <vector>
-#include <map>
-#include <unordered_map>
 #include <filesystem>
 #include <list>
+#include <map>
+#include <unordered_map>
+
+#include "file_intent.h"
 
 namespace app
 {
-
-// for each file, we can perform 4 different actions
-// these are processed by renamer.cpp
-struct FileIntent {
-    enum Action {
-        RENAME      = 1<<0,
-        COMPLETE    = 1<<1,
-        IGNORE      = 1<<2,
-        DELETE      = 1<<3,
-        WHITELIST   = 1<<4,
-    };
-
-    std::string src;
-    std::string dest; // used by Action::RENAME to determine new location of file
-    Action action;
-    bool is_conflict; // used by other functions to check if action will conflict
-    bool is_active;   // flag that can be used to disable/enable an action
-};
 
 class ManagedFileIntent;
 
@@ -38,8 +26,7 @@ typedef std::map<std::string, std::list<std::string>> ConflictTable;
 // table for tracking upcoming additions
 typedef std::unordered_map<std::string, int> UpcomingCounts;
 
-// stores all pending diffs made to a series folder
-// also contains logic for determining which file intents produce conflicts
+// store the management data structures for an entire folder
 class ManagedFolder 
 {
 public:
@@ -78,7 +65,7 @@ private:
     void UpdateActionCount(FileIntent::Action action, int delta);
 };
 
-// wrapper for FileIntent which handles managing conflicting intents
+// wrapper for FileIntent which updates the parent folder data structure
 class ManagedFileIntent 
 {
 private:

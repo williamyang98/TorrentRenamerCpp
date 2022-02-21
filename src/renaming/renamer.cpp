@@ -1,9 +1,8 @@
-#include <filesystem>
+#include "renamer.h"
 
+#include <filesystem>
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
-
-#include "renamer.h"
 
 namespace app 
 {

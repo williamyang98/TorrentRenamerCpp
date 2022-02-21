@@ -19,7 +19,7 @@
 namespace tvdb_api 
 {
 
-// #define BASE_URL "https://api.thetvdb.com/"
+//#define BASE_URL "https://api.thetvdb.com/"
 #define BASE_URL "http://api.thetvdb.com/"
 
 void validate_response(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {

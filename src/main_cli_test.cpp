@@ -12,20 +12,24 @@
 #include <filesystem>
 
 #define PROFILE_ENABLED 0
+#include "util/Instrumentor.h"
+#include "util/console_colours.h"
 
-#include "Instrumentor.h"
-#include "console_colours.h"
-
-#include "app_credentials_schema.h"
-#include "tvdb_api.h"
-#include "scanner.h"
-#include "file_loading.h"
+#include "app/app_credentials_schema.h"
+#include "tvdb_api/tvdb_api.h"
+#include "tvdb_api/tvdb_api_schema.h"
+#include "tvdb_api/tvdb_models.h"
+#include "tvdb_api/tvdb_json.h"
+#include "renaming/scanner.h"
+#include "renaming/file_intent.h"
+#include "renaming/managed_folder.h"
+#include "util/file_loading.h"
 
 namespace fs = std::filesystem;
 
 void scan_directory(const fs::path &subdir);
 void assert_validation(bool is_valid, const char *message);
-rapidjson::Document assert_document_load(app::DocumentLoadResult res, const char *message);
+rapidjson::Document assert_document_load(util::DocumentLoadResult res, const char *message);
 
 int main(int argc, char** argv) {
     if (argc == 1) {
@@ -34,14 +38,14 @@ int main(int argc, char** argv) {
     }
 
     auto cred_doc = assert_document_load(
-        app::load_document_from_file("credentials.json"),
+        util::load_document_from_file("res/credentials.json"),
         "Loading credentials file");
 
     assert_validation(
-        app::validate_document(cred_doc, app::CREDENTIALS_SCHEMA), 
+        util::validate_document(cred_doc, app::CREDENTIALS_SCHEMA), 
         "Credentials file");
 
-    app::write_json_to_stream(cred_doc, std::cout);
+    util::write_json_to_stream(cred_doc, std::cout);
 
     // Instrumentor::Get().BeginSession("Renaming");
 
@@ -72,8 +76,8 @@ void assert_validation(bool is_valid, const char *message) {
     exit(1);
 }
 
-rapidjson::Document assert_document_load(app::DocumentLoadResult res, const char *message) {
-    if (res.code != app::DocumentLoadCode::OK) {
+rapidjson::Document assert_document_load(util::DocumentLoadResult res, const char *message) {
+    if (res.code != util::DocumentLoadCode::OK) {
         std::cerr << "Failed to load document (" << message << ")" << std::endl;
         exit(1);
     }
@@ -86,30 +90,30 @@ void scan_directory(const fs::path &subdir) {
     rapidjson::Document series_info, episodes_info;
 
     // load from cache
-    if (0) {
+    if (1) {
         const fs::path series_cache_fn = subdir / "series.json";
         series_info = assert_document_load(
-            app::load_document_from_file(series_cache_fn.string().c_str()),
+            util::load_document_from_file(series_cache_fn.string().c_str()),
             "Loading series file");
 
         const fs::path episodes_cache_fn = subdir / "episodes.json";
         episodes_info = assert_document_load(
-            app::load_document_from_file(episodes_cache_fn.string().c_str()),
+            util::load_document_from_file(episodes_cache_fn.string().c_str()),
             "Loading episodes file");
     
     // load from db
     } else {
         auto cred_doc = assert_document_load(
-            app::load_document_from_file("credentials.json"),
+            util::load_document_from_file("res/credentials.json"),
             "Loading credentials file");
 
         assert_validation(
-            app::validate_document(cred_doc, app::CREDENTIALS_SCHEMA),
+            util::validate_document(cred_doc, app::CREDENTIALS_SCHEMA),
             "Validating credentials file");
 
         const fs::path series_cache_fn = subdir / "series.json";
         series_info = assert_document_load(
-            app::load_document_from_file(series_cache_fn.string().c_str()),
+            util::load_document_from_file(series_cache_fn.string().c_str()),
             "Loading series file");
 
         std::string token;
@@ -127,7 +131,7 @@ void scan_directory(const fs::path &subdir) {
             token = std::move(res.value());
         }
 
-        auto series_cache   = app::load_series_info(series_info);
+        auto series_cache   = tvdb_api::load_series_info(series_info);
         uint32_t id = series_cache.id;
 
         auto episodes_info_doc = tvdb_api::get_series_episodes(id, token.c_str());
@@ -139,10 +143,10 @@ void scan_directory(const fs::path &subdir) {
         episodes_info = std::move(episodes_info_doc.value());
     }
 
-    auto series_cache   = app::load_series_info(series_info);
-    auto episodes_cache = app::load_series_episodes_info(episodes_info);
+    auto series_cache   = tvdb_api::load_series_info(series_info);
+    auto episodes_cache = tvdb_api::load_series_episodes_info(episodes_info);
 
-    app::TVDB_Cache tvdb_cache { series_cache, episodes_cache };
+    tvdb_api::TVDB_Cache tvdb_cache { series_cache, episodes_cache };
 
     app::RenamingConfig cfg;
     cfg.blacklist_extensions.push_back("nfo");

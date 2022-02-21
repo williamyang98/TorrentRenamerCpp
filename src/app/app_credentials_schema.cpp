@@ -1,5 +1,5 @@
 #include "app_credentials_schema.h"
-#include "file_loading.h"
+#include "util/file_loading.h"
 
 namespace app {
 
@@ -25,6 +25,6 @@ R"({
     "required": ["credentials"]
 })";
 
-extern rapidjson::SchemaDocument CREDENTIALS_SCHEMA = load_schema_from_cstr(CREDENTIALS_SCHEMA_STR);
+extern rapidjson::SchemaDocument CREDENTIALS_SCHEMA = util::load_schema_from_cstr(CREDENTIALS_SCHEMA_STR);
 
 }

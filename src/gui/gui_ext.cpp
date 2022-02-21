@@ -1,3 +1,6 @@
+#include "gui_ext.h"
+#include "app/app_folder.h"
+
 #include <stdio.h>
 #include <string>
 #include <mutex>
@@ -9,7 +12,6 @@
 #include <imgui_stdlib.h>
 #include <fmt/format.h>
 
-#include "gui_ext.h"
 #include "font_awesome_definitions.h"
 
 #define WIN32_LEAN_AND_MEAN

@@ -1,24 +1,23 @@
 #pragma once
 
-#include <filesystem>
 #include <string>
-#include <vector>
-#include <list>
-#include <atomic>
-#include <mutex>
-#include <functional>
+#include <filesystem>
 #include <memory>
+#include <mutex>
+#include <atomic>
 
-#include "tvdb_api.h"
-#include "se_regex.h"
-#include "scanner.h"
-#include "file_loading.h"
-#include "ctpl_stl.h"
+#include "tvdb_api/tvdb_models.h"
+#include "renaming/managed_folder.h"
+#include "renaming/renaming_config.h"
 
-namespace app 
-{
+namespace app {
 
-// App object for managing a folder
+// contains the necessary data structures to execute actions on a managed folder
+// primarily contains:
+// - Managed folder object
+// - TVDB_Cache for that series
+// - Search results of a tvdb api search
+// - The renaming config that is loaded from config file
 class SeriesFolder 
 {
 public:
@@ -36,7 +35,7 @@ public:
 
     // keep a mutex on members which are used in rendering and undergo mutation during actions
     // cache of tvdb data
-    TVDB_Cache m_cache;
+    tvdb_api::TVDB_Cache m_cache;
     bool m_is_info_cached;
     std::mutex m_cache_mutex;
 
@@ -50,7 +49,7 @@ public:
     std::mutex m_errors_mutex;
 
     // store the search result for a tvdb search query
-    std::vector<SeriesInfo> m_search_result;
+    std::vector<tvdb_api::SeriesInfo> m_search_result;
     std::mutex m_search_mutex;
 
     // keep track of whether we are busy 
@@ -75,43 +74,4 @@ private:
     void push_error(const std::string &str);
 };
 
-struct AppConfig {
-    std::string credentials_filepath;
-    std::vector<std::string> whitelist_folders;
-    std::vector<std::string> whitelist_filenames;
-    std::vector<std::string> blacklist_extensions; 
-    std::vector<std::string> whitelist_tags; 
-};
-
-AppConfig load_app_config_from_filepath(const char *filename);
-
-// Main app object which contains all folders
-class App 
-{
-public:
-    std::filesystem::path m_root;
-    RenamingConfig m_cfg;
-    std::string m_token;
-    std::string m_credentials_filepath;
-
-    std::list<std::shared_ptr<SeriesFolder>> m_folders;
-    std::shared_ptr<SeriesFolder> m_current_folder;
-
-    std::vector<std::string> m_app_errors;
-    std::mutex m_app_errors_mutex;
-    std::list<std::string> m_app_warnings;
-    std::mutex m_app_warnings_mutex;
-private:
-    ctpl::thread_pool m_thread_pool;
-    std::atomic<int> m_global_busy_count;
-public:
-    App(const char *config_filepath);
-    void authenticate();
-    void refresh_folders();
-    int get_folder_busy_count() { return m_global_busy_count; }
-    void queue_async_call(std::function<void (int)> call);
-    void queue_app_error(const std::string &error);
-    void queue_app_warning(const std::string &warning);
-};
-
-};
+}

@@ -5,7 +5,6 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
-#include "imgui_config.h"
 
 #include <stdio.h>
 #include <iostream>
@@ -15,9 +14,10 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 
-#include "app.h"
-#include "gui_ext.h"
-#include "font_awesome_definitions.h"
+#include "app/app.h"
+#include "gui/gui_ext.h"
+#include "gui/font_awesome_definitions.h"
+#include "gui/imgui_config.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

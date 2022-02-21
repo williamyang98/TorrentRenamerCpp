@@ -1,9 +1,9 @@
+#include "managed_folder.h"
+
 #include <vector>
 #include <filesystem>
 #include <string>
 #include <fmt/core.h>
-
-#include "folder_diff.h"
 
 namespace app {
 

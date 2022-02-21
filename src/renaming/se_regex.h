@@ -3,7 +3,6 @@
 #include <regex>
 #include <optional>
 #include <string>
-#include <array>
 #include <vector>
 
 namespace app

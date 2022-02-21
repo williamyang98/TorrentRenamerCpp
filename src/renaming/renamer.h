@@ -11,4 +11,5 @@ bool rename_series_directory(const std::filesystem::path &root, T &intents);
 
 };
 
+// we need template definition
 #include "renamer.cpp"

@@ -1,3 +1,5 @@
+#include "scanner.h"
+
 #include <vector>
 #include <filesystem>
 #include <string>
@@ -6,12 +8,14 @@
 
 #include <fmt/core.h>
 
-#include "Instrumentor.h"
-#include "console_colours.h"
+#include "util/Instrumentor.h"
+#include "tvdb_api/tvdb_models.h"
 
 #include "se_regex.h"
-#include "scanner.h"
-#include "file_loading.h"
+#include "file_intent.h"
+
+// for debugging the scanning function
+//#include "util/console_colours.h"
 
 namespace app {
 
@@ -48,11 +52,12 @@ std::string create_filename(
 
 std::vector<FileIntent> scan_directory(
     const fs::path &root, 
-    const TVDB_Cache &cache, 
+    const tvdb_api::TVDB_Cache &cache, 
     const RenamingConfig &cfg) 
 {
     PROFILE_FUNC();
 
+    const auto &ep_table = cache.episodes;
     std::vector<FileIntent> intents;
 
     if (!fs::is_directory(root)) {
@@ -147,9 +152,8 @@ std::vector<FileIntent> scan_directory(
         PROFILE_MANUAL_BEGIN(pending_block);
 
         const auto &match = mr.value();
-        EpisodeKey key { match.season, match.episode };
+        tvdb_api::EpisodeKey key { match.season, match.episode };
 
-        const auto &ep_table = cache.episodes;
         const auto new_parent_dir = root / fmt::format("Season {:02d}", key.season);
 
         // create tags
