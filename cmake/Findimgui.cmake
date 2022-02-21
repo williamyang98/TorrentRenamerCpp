@@ -44,6 +44,7 @@ set(IMGUI_DXLIBS glfw opengl32.lib)
 add_library(imgui::imgui ALIAS imgui)
 target_include_directories(imgui PUBLIC "${SRC_DIR}")
 target_include_directories(imgui PUBLIC "${SRC_DIR}/backends")
+target_include_directories(imgui PUBLIC "${SRC_DIR}/misc/cpp")
 target_link_libraries(imgui PUBLIC ${IMGUI_DXLIBS})
 target_compile_definitions(imgui PUBLIC "/MP")
 
