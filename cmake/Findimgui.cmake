@@ -46,7 +46,9 @@ target_include_directories(imgui PUBLIC "${SRC_DIR}")
 target_include_directories(imgui PUBLIC "${SRC_DIR}/backends")
 target_include_directories(imgui PUBLIC "${SRC_DIR}/misc/cpp")
 target_link_libraries(imgui PUBLIC ${IMGUI_DXLIBS})
-target_compile_definitions(imgui PUBLIC "/MP")
+
+# Disable multiprocessing since this break debug builds for msbuild
+# target_compile_definitions(imgui PUBLIC "/MP")
 
 # add_executable(imgui_example "examples/example_win32_directx9/main.cpp")
 # add_executable(imgui_example "examples/example_win32_directx11/main.cpp")

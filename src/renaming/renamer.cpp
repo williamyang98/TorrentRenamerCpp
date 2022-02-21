@@ -18,14 +18,10 @@ bool rename_series_directory(const fs::path &root, T &intents) {
             continue;
         }
 
-        // if intent is conflicting, stop it from overriding files
-        if (intent.is_conflict) {
-            continue;
-        }
-
-        auto src_path = root / intent.src;
-
+        // allow deletes to occur even if they are conflicting
+        // this is fine since deleting a conflicting source file could resolve conflicts
         if (intent.action == FileIntent::Action::DELETE) {
+            auto src_path = root / intent.src;
             try {
                 fs::remove(src_path);
             } catch (fs::filesystem_error &ex) {
@@ -35,7 +31,13 @@ bool rename_series_directory(const fs::path &root, T &intents) {
             continue;
         }
 
+        // if intent is conflicting, stop it from overriding files
+        if (intent.is_conflict) {
+            continue;
+        }
+
         if (intent.action == FileIntent::Action::RENAME) {
+            auto src_path = root / intent.src;
             auto dest_path = root / intent.dest;
             try {
                 auto dest_path_folder = fs::path(dest_path).remove_filename();

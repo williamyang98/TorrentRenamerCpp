@@ -126,6 +126,9 @@ struct {
     }
 } CategoryFilters;
 
+// our global colors
+const ImU32 CONFLICT_BG_COLOR = 0x6F0000FF;
+
 void RenderApp(App &main_app) {
     // render out of order to get last item as default focus
     RenderAppWarnings(main_app);
@@ -455,6 +458,12 @@ static void RenderEpisodesGenericList(
             }
 
             ImGui::TableNextRow();
+
+            const bool is_conflict = intent.GetIsConflict();
+            if (is_conflict) {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, CONFLICT_BG_COLOR);
+            }
+
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
             const char *popup_key = "##intent action popup";
@@ -531,6 +540,12 @@ void RenderFilesRename(SeriesFolder &folder) {
             ImGui::PushID(row_id++);
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
+
+            const bool is_conflict = intent.GetIsConflict();
+            if (is_conflict) {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, CONFLICT_BG_COLOR);
+            }
+
             bool is_active_copy = intent.GetIsActive();
             if (ImGui::Checkbox("##intent_checkbox", &is_active_copy)) {
                 intent.SetIsActive(is_active_copy);
@@ -605,6 +620,11 @@ void RenderFilesDelete(SeriesFolder &folder) {
 
             ImGui::TableNextRow();
 
+            const bool is_conflict = intent.GetIsConflict();
+            if (is_conflict) {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, CONFLICT_BG_COLOR);
+            }
+
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
 
@@ -666,12 +686,14 @@ void RenderFilesConflict(SeriesFolder &folder) {
                     if (!search_filter.PassFilter(intent.GetSrc().c_str())) {
                         continue;
                     }
+
+                    const bool is_rename = intent.GetAction() == FileIntent::Action::RENAME;
                     
                     ImGui::PushID(key.c_str());
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
 
-                    if (intent.GetAction() == FileIntent::Action::RENAME) {
+                    if (is_rename) {
                         bool is_active_copy = intent.GetIsActive();
                         if (ImGui::Checkbox("##active_check", &is_active_copy)) {
                             intent.SetIsActive(is_active_copy);
@@ -682,14 +704,14 @@ void RenderFilesConflict(SeriesFolder &folder) {
                     ImGui::TextWrapped("%s", intent.GetSrc().c_str());
 
                     ImGui::TableSetColumnIndex(2);
-                    if (intent.GetAction() == FileIntent::Action::RENAME) {
+                    if (is_rename) {
                         ImGui::PushItemWidth(-1.0f);
                         if (ImGui::InputText("###dest path", &intent.GetDest())) {
                             intent.OnDestChange();
                         }
                         ImGui::PopItemWidth();
                     } else {
-                        ImGui::TextWrapped("%s", intent.GetDest().c_str());
+                        //ImGui::TextWrapped("%s", intent.GetDest().c_str());
                     }
 
                     auto popup_label = fmt::format("##action popup_{}", key.c_str());

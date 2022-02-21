@@ -104,28 +104,29 @@ void ManagedFolder::UpdateConflictTable() {
     conflicts.clear();
 
     for (auto &[key, intent]: intents) {
-        // can't conflict if it isn't active
-        if (!intent.GetIsActive()) {
-            intent.SetIsConflict(false);
-            continue;
-        }
+        const bool is_rename = (intent.GetAction() == FileIntent::Action::RENAME);
 
-        // cannot conflict if it isn't renaming
-        bool is_rename = (intent.GetAction() == FileIntent::Action::RENAME);
-        if (!is_rename) {
-            intent.SetIsConflict(false);
-            continue;
-        }
-
-        // source conflicts with upcoming change
-        if (upcoming_counts[intent.GetSrc()] > 0) {
+        // source conflicts with upcoming change, and it isn't a rename action
+        if (!is_rename && (upcoming_counts[intent.GetSrc()] > 0)) {
             intent.SetIsConflict(true);
             conflicts[intent.GetSrc()].push_back(key);
             continue;
         }
 
+        // destination can't conflict if it isn't active
+        if (!intent.GetIsActive()) {
+            intent.SetIsConflict(false);
+            continue;
+        }
+
+        // destination can't conflict if it isn't a rename
+        if (!is_rename) {
+            intent.SetIsConflict(false);
+            continue;
+        }
+
         // destination on rename conflicts with existing file or incoming change
-        bool is_dst_conflict =
+        const bool is_dst_conflict =
             (upcoming_counts[intent.GetDest()] > 1) ||
             (intents.find(intent.GetDest()) != intents.end());
         
