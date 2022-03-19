@@ -1,4 +1,16 @@
 [submodule "vendor/imgui"]
-		path = vendor/imgui
-		url = https://github.com/ocornut/imgui.git
+	path = vendor/imgui
+	url = https://github.com/ocornut/imgui.git
         branch = docking
+[submodule "vendor/fmt"]
+	path = vendor/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "vendor/glfw"]
+	path = vendor/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "vendor/rapidjson"]
+	path = vendor/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
+[submodule "vendor/spdlog"]
+	path = vendor/spdlog
+	url = https://github.com/gabime/spdlog.git

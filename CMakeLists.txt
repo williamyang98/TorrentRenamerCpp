@@ -1,18 +1,35 @@
 cmake_minimum_required(VERSION 3.10)
 project(TorrentRenamer)
 
-list(APPEND VCPKG_FEATURE_FLAGS "versions")
+option(RAPIDJSON_BUILD_DOC "" OFF)
+option(RAPIDJSON_BUILD_EXAMPLES "" OFF)
+option(RAPIDJSON_BUILD_TESTS "" OFF)
+option(RAPIDJSON_BUILD_THIRDPARTY_GTEST "" OFF)
 
-find_package(cpr CONFIG REQUIRED)
-find_package(RapidJSON CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
+option(GLFW_BUILD_EXAMPLES "" OFF)
+option(GLFW_BUILD_TESTS "" OFF)
+option(GLFW_BUILD_DOCS "" OFF)
+option(GLFW_INSTALL "" OFF)
 
-set (CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-find_package(imgui)
+option(SPDLOG_FMT_EXTERNAL "" ON)
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
+add_subdirectory(vendor/rapidjson)
+add_subdirectory(vendor/fmt)
+add_subdirectory(vendor/spdlog)
+add_subdirectory(vendor/cpr)
+
+include_directories(vendor/rapidjson/include)
+
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+find_package(imgui REQUIRED)
+#find_package(cpr REQUIRED)
+#find_package(RapidJSON REQUIRED)
+#find_package(fmt REQUIRED)
+#find_package(spdlog REQUIRED)
+
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
+# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -O3")
 
 set(SRC_FILES 
     src/tvdb_api/tvdb_api.cpp
@@ -28,6 +45,7 @@ set(SRC_FILES
     src/app/app_config.cpp
     src/app/app_credentials_schema.cpp
     src/util/file_loading.cpp
+    src/os_dep.cpp
 )
 
 set(GUI_FILES
@@ -38,14 +56,14 @@ add_executable(cli_test src/main_cli_test.cpp ${SRC_FILES})
 include_directories(cli_test src/)
 set_target_properties(cli_test PROPERTIES CXX_STANDARD 20)
 target_link_libraries(cli_test PRIVATE 
-    cpr::cpr rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
-target_compile_options(cli_test PRIVATE "/MP")
+    cpr::cpr fmt::fmt spdlog::spdlog)
+# target_compile_options(cli_test PRIVATE "/MP")
 
 # imgui implementation of gui application
 add_executable(main src/main_gui.cpp ${GUI_FILES} ${SRC_FILES})
 include_directories(main src/)
 set_target_properties(main PROPERTIES CXX_STANDARD 20)
 target_link_libraries(main PRIVATE 
-    cpr::cpr rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
+    cpr::cpr fmt::fmt spdlog::spdlog)
 target_link_libraries(main PUBLIC imgui)
-target_compile_options(main PRIVATE "/MP")
+# target_compile_options(main PRIVATE "/MP")

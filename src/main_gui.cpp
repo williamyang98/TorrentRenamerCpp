@@ -31,6 +31,8 @@
 #include "gui/font_awesome_definitions.h"
 #include "gui/imgui_config.h"
 
+// if we are on windows, we need to startup some win32 event loop stuff
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -44,6 +46,7 @@
 
 #ifdef NDEBUG
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+#endif
 #endif
 
 static void glfw_error_callback(int error, const char* description)
@@ -65,8 +68,10 @@ int main(int argc, char **argv)
     #else
     spdlog::set_level(spdlog::level::debug);
     #endif
-
+    
+    #ifdef _WIN32
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    #endif
     
     int rv = 1;
     try {
@@ -77,7 +82,10 @@ int main(int argc, char **argv)
         rv = 1;
     }
 
+    #ifdef _WIN32
     CoUninitialize();
+    #endif
+
     return rv;
 }
 

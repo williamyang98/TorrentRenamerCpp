@@ -14,81 +14,13 @@
 
 #include "font_awesome_definitions.h"
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#include <tchar.h>
-#include <shobjidl.h>
-#include <shtypes.h>
-
-#pragma comment(lib, "mincore")
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "oleaut32.lib")
-
-// get rid of conflicting windows macros
-#undef IGNORE
-#undef DELETE
+#include "os_dep.h"
 
 namespace app::gui 
 {
 
 constexpr int MAX_BUFFER_SIZE = 256;
 namespace fs = std::filesystem;
-
-std::string wide_string_to_string(const std::wstring& wide_string)
-{
-    if (wide_string.empty())
-    {
-        return "";
-    }
-
-    const auto size_needed = WideCharToMultiByte(CP_UTF8, 0, &wide_string.at(0), (int)wide_string.size(), nullptr, 0, nullptr, nullptr);
-    if (size_needed <= 0)
-    {
-        throw std::runtime_error("WideCharToMultiByte() failed: " + std::to_string(size_needed));
-    }
-
-    std::string result(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, &wide_string.at(0), (int)wide_string.size(), &result.at(0), size_needed, nullptr, nullptr);
-    return result;
-}
-
-// helper object for creating windows file dialogs
-class CoFileDialog 
-{
-public:
-    CoFileDialog() {
-        HRESULT hr = 
-            CoCreateInstance(
-                CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
-                IID_IFileOpenDialog, reinterpret_cast<void**>(&m_dialog));
-        if (!SUCCEEDED(hr)) {
-            throw std::runtime_error("Failed to create file dialog object");
-        }
-    }
-    std::optional<std::string> open() {
-        HRESULT hr;
-
-        // open the dialog
-        hr = m_dialog->Show(NULL);
-        if (!SUCCEEDED(hr)) return {};
-
-        IShellItem *pItem;
-        hr = m_dialog->GetResult(&pItem);
-        if (!SUCCEEDED(hr)) return {};
-
-        PWSTR pFilepath;
-        hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pFilepath);
-        if (!SUCCEEDED(hr)) return {};
-
-        std::wstring ws(pFilepath);
-        return wide_string_to_string(ws);
-    }   
-    inline IFileOpenDialog* operator->() const { return m_dialog; }
-private:
-    IFileOpenDialog *m_dialog;
-};
 
 // render components
 static void RenderSeriesList(App &main_app);
@@ -176,7 +108,7 @@ void RenderSeriesList(App &main_app) {
     auto &folders = main_app.m_folders;
     static char LABEL_BUFFER[MAX_BUFFER_SIZE+1] = {0};
 
-    _snprintf_s(
+    snprintf(
         LABEL_BUFFER, MAX_BUFFER_SIZE,
         "Series (%llu)###Series", folders.size());
     
@@ -188,9 +120,7 @@ void RenderSeriesList(App &main_app) {
     
     if (ImGui::BeginMenuBar()) {
         if (ImGui::MenuItem("Select folder")) {
-            auto dialog = CoFileDialog();
-            dialog->SetOptions(FOS_PICKFOLDERS);
-            auto opt = dialog.open();
+            auto opt = os_dep::open_folder_dialog();
             if (opt) {
                 main_app.m_root = fs::path(std::move(opt.value()));
                 main_app.refresh_folders();
@@ -900,7 +830,7 @@ void RenderAppWarnings(App &main_app) {
     auto lock = std::scoped_lock(main_app.m_app_warnings_mutex); 
     auto &warnings = main_app.m_app_warnings;
     static char window_name[MAX_BUFFER_SIZE+1] = {0};
-    _snprintf_s(
+    snprintf(
             window_name, MAX_BUFFER_SIZE, 
             "Warnings (%llu)###application warnings", warnings.size()); 
 

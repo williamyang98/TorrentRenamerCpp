@@ -29,15 +29,8 @@ namespace fs = std::filesystem;
 
 App::App(const char *config_filepath)
 {
-    #ifdef NDEBUG
     const int num_threads = 1000;
-    #else
-    // when debugging the address sanitizer cant handle alot of threads at once
-    // const int num_threads = std::thread::hardware_concurrency();
-    const int num_threads = std::thread::hardware_concurrency() * 16;
-    #endif
-
-    m_thread_pool.resize(num_threads);
+m_thread_pool.resize(num_threads);
 
     m_current_folder = nullptr;
     m_global_busy_count = 0;
@@ -94,7 +87,8 @@ void App::authenticate() {
         
         if (!res) {
             spdlog::error("Failed to login");
-            queue_app_error("Failed to login");
+            /* queue_app_error("Failed to login"); */
+            queue_app_warning("Failed to login");
             return;
         }
 

@@ -19,7 +19,7 @@
 namespace tvdb_api 
 {
 
-//#define BASE_URL "https://api.thetvdb.com/"
+/* #define BASE_URL "https://api.thetvdb.com/" */
 #define BASE_URL "http://api.thetvdb.com/"
 
 void validate_response(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {
@@ -63,6 +63,8 @@ std::optional<std::string> login(const char *apikey, const char *userkey, const 
         cpr::Header{{"Content-Type", "application/json"}},
         cpr::Body(sb.GetString())
     );
+
+    spdlog::debug(fmt::format("Got response code {} on login", r.status_code));
 
     if (r.status_code != 200) {
         return {};

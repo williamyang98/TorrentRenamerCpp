@@ -28,12 +28,7 @@
 #define EPISODES_CACHE_FN   "episodes.json"
 #define SERIES_CACHE_FN     "series.json"
 
-// for opening folder dialog
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#define NOGDI
-#include <windows.h>
-#include <shellapi.h>
+#include "os_dep.h"
 
 namespace app 
 {
@@ -246,13 +241,13 @@ void SeriesFolder::open_folder(const std::string &path) {
     auto filepath = m_path / path;
     auto parent_dir = filepath.remove_filename();
     auto parent_dir_str = parent_dir.string();
-    ShellExecuteA(NULL, "open", parent_dir_str.c_str(), NULL, NULL, SW_SHOW);
+    os_dep::open_folder(parent_dir_str);
 }
 
 void SeriesFolder::open_file(const std::string &path) {
     auto filepath = m_path / path;
     auto filepath_str = filepath.string();
-    ShellExecuteA(NULL, "open", filepath_str.c_str(), NULL, NULL, SW_SHOW);
+    os_dep::open_file(filepath_str);
 }
 
 }
