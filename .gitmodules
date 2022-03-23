@@ -14,3 +14,6 @@
 [submodule "vendor/spdlog"]
 	path = vendor/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "vendor/cpr"]
+	path = vendor/cpr
+        url = https://github.com/libcpr/cpr.git
