@@ -29,8 +29,9 @@ public:
         COMPLETED       = 1<<4, 
         EMPTY           = 1<<5,
     };
-public:
+private:
     const std::filesystem::path m_path;
+public:
     RenamingConfig &m_cfg;
 
     // keep a mutex on members which are used in rendering and undergo mutation during actions
@@ -67,6 +68,7 @@ public:
     void update_state_from_cache();
     bool load_search_series_from_tvdb(const char *name, const char *token);
     bool execute_actions();
+    const auto & GetPath() const { return m_path; }
     void open_folder(const std::string &path);
     void open_file(const std::string &path);
 

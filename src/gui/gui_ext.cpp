@@ -172,11 +172,12 @@ void RenderSeriesList(App &main_app) {
     }
 
     ImGui::Separator();
+
     if (ImGui::BeginListBox("##series_list_box", ImVec2(-1,-1))) {
 
         int folder_id = 0;
         for (auto &folder: folders) {
-            auto folder_name = folder->m_path.filename().string();
+            auto folder_name = folder->GetPath().filename().string();
 
             const auto status_info = GetFolderStatusCharacter(folder->m_status);
 
@@ -189,22 +190,30 @@ void RenderSeriesList(App &main_app) {
             }
 
             auto is_selected = main_app.m_current_folder == folder;
-    
             ImGui::PushID(folder_id++);
+            
+            // status
             ImGui::PushStyleColor(ImGuiCol_Text, status_info.color.Value);
             bool selected_pressed = ImGui::Selectable(status_info.chr, is_selected);
             ImGui::PopStyleColor();
-            ImGui::PopID();
-
+            // open context menu for additional folder things
+            snprintf(LABEL_BUFFER, MAX_BUFFER_SIZE, "###series_folder_context_menu_%d", folder_id);
+            if (ImGui::BeginPopupContextItem(LABEL_BUFFER)) {
+                if (ImGui::MenuItem("Open Folder")) {
+                    os_dep::open_folder(folder->GetPath());
+                }
+                ImGui::EndPopup();
+            }
             ImGui::SameLine();
+            // folder name
             ImGui::Text(folder_name.c_str());
-
             if (selected_pressed) {
                 main_app.m_current_folder = folder;
                 main_app.queue_async_call([&folder](int pid) {
                     folder->update_state_from_cache();
                 });
             }
+            ImGui::PopID();
         }
         ImGui::EndListBox();
     }
