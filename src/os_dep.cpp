@@ -18,6 +18,9 @@
 // get rid of conflicting windows macros
 #undef IGNORE
 #undef DELETE
+
+#include <stdexcept>
+#include <shellapi.h>
 #endif
 
 #ifdef __linux__

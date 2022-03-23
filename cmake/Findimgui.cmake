@@ -3,7 +3,7 @@ project(imgui)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/vendor/imgui)
 
-add_library(imgui 
+add_library(imgui STATIC
     "${SRC_DIR}/imgui.h"
     "${SRC_DIR}/imgui_internal.h"
     "${SRC_DIR}/imgui.cpp"
@@ -49,7 +49,6 @@ endif(UNIX)
 # set(IMGUI_DXLIBS "d3d11.lib" "dxgi.lib" "d3dcompiler.lib")
 # set(IMGUI_DXLIBS "d3d12.lib" "dxgi.lib" "d3dcompiler.lib")
 
-add_library(imgui::imgui ALIAS imgui)
 target_include_directories(imgui PUBLIC "${SRC_DIR}")
 target_include_directories(imgui PUBLIC "${SRC_DIR}/backends")
 target_include_directories(imgui PUBLIC "${SRC_DIR}/misc/cpp")

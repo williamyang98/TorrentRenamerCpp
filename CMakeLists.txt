@@ -29,7 +29,6 @@ find_package(imgui REQUIRED)
 
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
 # set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -O3")
 
 set(SRC_FILES 
     src/tvdb_api/tvdb_api.cpp
@@ -57,7 +56,6 @@ include_directories(cli_test src/)
 set_target_properties(cli_test PROPERTIES CXX_STANDARD 20)
 target_link_libraries(cli_test PRIVATE 
     cpr::cpr fmt::fmt spdlog::spdlog)
-# target_compile_options(cli_test PRIVATE "/MP")
 
 # imgui implementation of gui application
 add_executable(main src/main_gui.cpp ${GUI_FILES} ${SRC_FILES})
@@ -66,4 +64,8 @@ set_target_properties(main PROPERTIES CXX_STANDARD 20)
 target_link_libraries(main PRIVATE 
     cpr::cpr fmt::fmt spdlog::spdlog)
 target_link_libraries(main PUBLIC imgui)
-# target_compile_options(main PRIVATE "/MP")
+
+if (WIN32)
+target_compile_options(cli_test PRIVATE "/MP")
+target_compile_options(main PRIVATE "/MP")
+endif (WIN32)
