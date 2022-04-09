@@ -21,6 +21,8 @@
 
 #include <iostream>
 #include <filesystem>
+#include <chrono>
+#include <thread>
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
@@ -49,9 +51,18 @@
 #endif
 #endif
 
+// NOTE: we use this to prevent excessive draws when the window is unfocused
+static int is_main_window_focused = true;
+
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+}
+
+// this occurs when we minimise or change focus to another window
+static void glfw_window_focus_callback(GLFWwindow* window, int focused)
+{
+    is_main_window_focused = focused;
 }
 
 namespace fs = std::filesystem;
@@ -127,6 +138,8 @@ int run(const char *root_path)
             NULL, NULL);
     if (window == NULL)
         return 1;
+
+    glfwSetWindowFocusCallback(window, glfw_window_focus_callback);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
 
@@ -207,6 +220,11 @@ int run(const char *root_path)
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
 
+        if (!is_main_window_focused) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+            continue;
+        }
+
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -226,7 +244,7 @@ int run(const char *root_path)
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    	
+        
         // Update and Render additional Platform Windows
         // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
         //  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
