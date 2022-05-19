@@ -1,13 +1,13 @@
 @echo off
 
 :GETOPTS
-if /I "%1" == "vsdev" call cmd /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat"
+if /I "%1" == "vsdev" call cmd /k "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
 
 if /I "%1" == "cmake-conf" call^
  cmake --no-warn-unused-cli^
  -DCMAKE_TOOLCHAIN_FILE:STRING=C:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake^
  -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE^
- -B"build" -G"Visual Studio 16 2019"^
+ -B"build" -G"Visual Studio 17 2022"^
  -A"x64"
 
 if /I "%1" == "build" goto BUILD

@@ -219,7 +219,7 @@ void RenderSeriesList(App &main_app) {
             snprintf(LABEL_BUFFER, MAX_BUFFER_SIZE, "###series_folder_context_menu_%d", folder_id);
             if (ImGui::BeginPopupContextItem(LABEL_BUFFER)) {
                 if (ImGui::MenuItem("Open Folder")) {
-                    os_dep::open_folder(folder->GetPath());
+                    os_dep::open_folder(folder->GetPath().string());
                 }
                 ImGui::EndPopup();
             }
