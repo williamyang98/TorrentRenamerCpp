@@ -14,81 +14,13 @@
 
 #include "font_awesome_definitions.h"
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#include <tchar.h>
-#include <shobjidl.h>
-#include <shtypes.h>
-
-#pragma comment(lib, "mincore")
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "oleaut32.lib")
-
-// get rid of conflicting windows macros
-#undef IGNORE
-#undef DELETE
+#include "os_dep.h"
 
 namespace app::gui 
 {
 
 constexpr int MAX_BUFFER_SIZE = 256;
 namespace fs = std::filesystem;
-
-std::string wide_string_to_string(const std::wstring& wide_string)
-{
-    if (wide_string.empty())
-    {
-        return "";
-    }
-
-    const auto size_needed = WideCharToMultiByte(CP_UTF8, 0, &wide_string.at(0), (int)wide_string.size(), nullptr, 0, nullptr, nullptr);
-    if (size_needed <= 0)
-    {
-        throw std::runtime_error("WideCharToMultiByte() failed: " + std::to_string(size_needed));
-    }
-
-    std::string result(size_needed, 0);
-    WideCharToMultiByte(CP_UTF8, 0, &wide_string.at(0), (int)wide_string.size(), &result.at(0), size_needed, nullptr, nullptr);
-    return result;
-}
-
-// helper object for creating windows file dialogs
-class CoFileDialog 
-{
-public:
-    CoFileDialog() {
-        HRESULT hr = 
-            CoCreateInstance(
-                CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
-                IID_IFileOpenDialog, reinterpret_cast<void**>(&m_dialog));
-        if (!SUCCEEDED(hr)) {
-            throw std::runtime_error("Failed to create file dialog object");
-        }
-    }
-    std::optional<std::string> open() {
-        HRESULT hr;
-
-        // open the dialog
-        hr = m_dialog->Show(NULL);
-        if (!SUCCEEDED(hr)) return {};
-
-        IShellItem *pItem;
-        hr = m_dialog->GetResult(&pItem);
-        if (!SUCCEEDED(hr)) return {};
-
-        PWSTR pFilepath;
-        hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pFilepath);
-        if (!SUCCEEDED(hr)) return {};
-
-        std::wstring ws(pFilepath);
-        return wide_string_to_string(ws);
-    }   
-    inline IFileOpenDialog* operator->() const { return m_dialog; }
-private:
-    IFileOpenDialog *m_dialog;
-};
 
 // render components
 static void RenderSeriesList(App &main_app);
@@ -125,6 +57,28 @@ struct {
         whitelists.Clear();
     }
 } CategoryFilters;
+
+// our global selection ids
+struct {
+    int completes;
+    int ignores;
+    int renames;
+    int deletes;
+    int conflicts;
+    int whitelists;
+
+    void ClearAll() {
+        completes = -1;
+        ignores = -1;
+        renames = -1;
+        deletes = -1;
+        conflicts = -1;
+        whitelists = -1;
+    }
+} CategorySelectedIndex;
+
+// our global colors
+const ImU32 CONFLICT_BG_COLOR = 0x6F0000FF;
 
 void RenderApp(App &main_app) {
     // render out of order to get last item as default focus
@@ -173,7 +127,7 @@ void RenderSeriesList(App &main_app) {
     auto &folders = main_app.m_folders;
     static char LABEL_BUFFER[MAX_BUFFER_SIZE+1] = {0};
 
-    _snprintf_s(
+    snprintf(
         LABEL_BUFFER, MAX_BUFFER_SIZE,
         "Series (%llu)###Series", folders.size());
     
@@ -185,9 +139,7 @@ void RenderSeriesList(App &main_app) {
     
     if (ImGui::BeginMenuBar()) {
         if (ImGui::MenuItem("Select folder")) {
-            auto dialog = CoFileDialog();
-            dialog->SetOptions(FOS_PICKFOLDERS);
-            auto opt = dialog.open();
+            auto opt = os_dep::open_folder_dialog();
             if (opt) {
                 main_app.m_root = fs::path(std::move(opt.value()));
                 main_app.refresh_folders();
@@ -239,11 +191,12 @@ void RenderSeriesList(App &main_app) {
     }
 
     ImGui::Separator();
+
     if (ImGui::BeginListBox("##series_list_box", ImVec2(-1,-1))) {
 
         int folder_id = 0;
         for (auto &folder: folders) {
-            auto folder_name = folder->m_path.filename().string();
+            auto folder_name = folder->GetPath().filename().string();
 
             const auto status_info = GetFolderStatusCharacter(folder->m_status);
 
@@ -256,22 +209,30 @@ void RenderSeriesList(App &main_app) {
             }
 
             auto is_selected = main_app.m_current_folder == folder;
-    
             ImGui::PushID(folder_id++);
+            
+            // status
             ImGui::PushStyleColor(ImGuiCol_Text, status_info.color.Value);
             bool selected_pressed = ImGui::Selectable(status_info.chr, is_selected);
             ImGui::PopStyleColor();
-            ImGui::PopID();
-
+            // open context menu for additional folder things
+            snprintf(LABEL_BUFFER, MAX_BUFFER_SIZE, "###series_folder_context_menu_%d", folder_id);
+            if (ImGui::BeginPopupContextItem(LABEL_BUFFER)) {
+                if (ImGui::MenuItem("Open Folder")) {
+                    os_dep::open_folder(folder->GetPath().string());
+                }
+                ImGui::EndPopup();
+            }
             ImGui::SameLine();
+            // folder name
             ImGui::Text(folder_name.c_str());
-
             if (selected_pressed) {
                 main_app.m_current_folder = folder;
                 main_app.queue_async_call([&folder](int pid) {
                     folder->update_state_from_cache();
                 });
             }
+            ImGui::PopID();
         }
         ImGui::EndListBox();
     }
@@ -293,7 +254,7 @@ std::array<FileActionStringPair, 5> FileActionToString = {{
 }};
 
 static void RenderFileIntentChange(SeriesFolder &folder, ManagedFileIntent &intent, const char *label) {
-    if (ImGui::BeginPopup(label)) {
+    if (ImGui::BeginPopupContextItem()) {
         if (ImGui::Selectable("Open folder")) {
             folder.open_folder(intent.GetSrc());
         }
@@ -325,6 +286,7 @@ void RenderEpisodes(App &main_app) {
     static SeriesFolder *prev_folder = nullptr;
     if (prev_folder != main_app.m_current_folder.get()) {
         CategoryFilters.ClearAll();
+        CategorySelectedIndex.ClearAll();
     }
     prev_folder = main_app.m_current_folder.get();
 
@@ -433,7 +395,8 @@ void RenderEpisodes(App &main_app) {
 
 static void RenderEpisodesGenericList(
         SeriesFolder &folder, const char *table_id, FileIntent::Action action, 
-        ImGuiTextFilter &search_filter) 
+        ImGuiTextFilter &search_filter,
+        int &selected_idx) 
 {
     search_filter.Draw();
 
@@ -455,11 +418,22 @@ static void RenderEpisodesGenericList(
             }
 
             ImGui::TableNextRow();
+
+            const bool is_conflict = intent.GetIsConflict();
+            if (is_conflict) {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, CONFLICT_BG_COLOR);
+            }
+
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
             const char *popup_key = "##intent action popup";
-            if (ImGui::Selectable(name)) {
-                ImGui::OpenPopup(popup_key);
+            const bool is_selected = (i == selected_idx);
+            if (ImGui::Selectable(name, is_selected)) {
+                if (is_selected) {
+                    selected_idx = -1;
+                } else {
+                    selected_idx = i;
+                }
             }
             RenderFileIntentChange(folder, intent, popup_key);
             ImGui::PopID();
@@ -473,19 +447,22 @@ static void RenderEpisodesGenericList(
 void RenderFilesComplete(SeriesFolder &folder) {
     RenderEpisodesGenericList(
             folder, "##completed table", FileIntent::Action::COMPLETE,
-            CategoryFilters.completes);
+            CategoryFilters.completes,
+            CategorySelectedIndex.completes);
 }
 
 void RenderFilesIgnore(SeriesFolder &folder) {
     RenderEpisodesGenericList(
             folder, "##ignore table", FileIntent::Action::IGNORE,
-            CategoryFilters.ignores);
+            CategoryFilters.ignores,
+            CategorySelectedIndex.ignores);
 }
 
 void RenderFilesWhitelist(SeriesFolder &folder) {
     RenderEpisodesGenericList(
             folder, "##whitelist table", FileIntent::Action::WHITELIST,
-            CategoryFilters.whitelists);
+            CategoryFilters.whitelists,
+            CategorySelectedIndex.whitelists);
 }
 
 void RenderFilesRename(SeriesFolder &folder) {
@@ -517,6 +494,7 @@ void RenderFilesRename(SeriesFolder &folder) {
         ImGui::TableHeadersRow();
 
         int row_id  = 0;
+        int &selected_idx = CategorySelectedIndex.renames;
         for (auto &[key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::RENAME) continue; 
 
@@ -531,6 +509,12 @@ void RenderFilesRename(SeriesFolder &folder) {
             ImGui::PushID(row_id++);
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
+
+            const bool is_conflict = intent.GetIsConflict();
+            if (is_conflict) {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, CONFLICT_BG_COLOR);
+            }
+
             bool is_active_copy = intent.GetIsActive();
             if (ImGui::Checkbox("##intent_checkbox", &is_active_copy)) {
                 intent.SetIsActive(is_active_copy);
@@ -548,8 +532,13 @@ void RenderFilesRename(SeriesFolder &folder) {
 
             const char *popup_id = "##intent action popup";
             ImGui::SameLine();
-            if (ImGui::Selectable("###row popup button", false, ImGuiSelectableFlags_SpanAllColumns)) {
-                ImGui::OpenPopup(popup_id);
+            const bool is_selected = (row_id == selected_idx);
+            if (ImGui::Selectable("###row popup button", is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
+                if (is_selected) {
+                    selected_idx = -1;
+                } else {
+                    selected_idx = row_id;
+                }
             }
             RenderFileIntentChange(folder, intent, popup_id);
 
@@ -592,6 +581,7 @@ void RenderFilesDelete(SeriesFolder &folder) {
         ImGui::TableHeadersRow();
 
         int i = 0;
+        int &selected_idx = CategorySelectedIndex.deletes;
         for (auto &[key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::DELETE) continue; 
 
@@ -604,6 +594,11 @@ void RenderFilesDelete(SeriesFolder &folder) {
             }
 
             ImGui::TableNextRow();
+
+            const bool is_conflict = intent.GetIsConflict();
+            if (is_conflict) {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, CONFLICT_BG_COLOR);
+            }
 
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
@@ -618,8 +613,13 @@ void RenderFilesDelete(SeriesFolder &folder) {
             ImGui::SameLine();
 
             const char *popup_id = "##intent action popup";
+            const bool is_selected = (i == selected_idx);
             if (ImGui::Selectable("##action popup row", false, ImGuiSelectableFlags_SpanAllColumns)) {
-                ImGui::OpenPopup(popup_id);
+                if (is_selected) {
+                    selected_idx = -1;
+                } else {
+                    selected_idx = i;
+                }
             }
 
             RenderFileIntentChange(folder, intent, popup_id);
@@ -666,12 +666,14 @@ void RenderFilesConflict(SeriesFolder &folder) {
                     if (!search_filter.PassFilter(intent.GetSrc().c_str())) {
                         continue;
                     }
+
+                    const bool is_rename = intent.GetAction() == FileIntent::Action::RENAME;
                     
                     ImGui::PushID(key.c_str());
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
 
-                    if (intent.GetAction() == FileIntent::Action::RENAME) {
+                    if (is_rename) {
                         bool is_active_copy = intent.GetIsActive();
                         if (ImGui::Checkbox("##active_check", &is_active_copy)) {
                             intent.SetIsActive(is_active_copy);
@@ -682,20 +684,20 @@ void RenderFilesConflict(SeriesFolder &folder) {
                     ImGui::TextWrapped("%s", intent.GetSrc().c_str());
 
                     ImGui::TableSetColumnIndex(2);
-                    if (intent.GetAction() == FileIntent::Action::RENAME) {
+                    if (is_rename) {
                         ImGui::PushItemWidth(-1.0f);
                         if (ImGui::InputText("###dest path", &intent.GetDest())) {
                             intent.OnDestChange();
                         }
                         ImGui::PopItemWidth();
                     } else {
-                        ImGui::TextWrapped("%s", intent.GetDest().c_str());
+                        //ImGui::TextWrapped("%s", intent.GetDest().c_str());
                     }
 
                     auto popup_label = fmt::format("##action popup_{}", key.c_str());
                     ImGui::SameLine();
                     if (ImGui::Selectable("##action popup select", false, ImGuiSelectableFlags_SpanAllColumns)) {
-                        ImGui::OpenPopup(popup_label.c_str());
+                        /* ImGui::OpenPopup(popup_label.c_str()); */
                     }
 
                     RenderFileIntentChange(folder, intent, popup_label.c_str());
@@ -878,7 +880,7 @@ void RenderAppWarnings(App &main_app) {
     auto lock = std::scoped_lock(main_app.m_app_warnings_mutex); 
     auto &warnings = main_app.m_app_warnings;
     static char window_name[MAX_BUFFER_SIZE+1] = {0};
-    _snprintf_s(
+    snprintf(
             window_name, MAX_BUFFER_SIZE, 
             "Warnings (%llu)###application warnings", warnings.size()); 
 

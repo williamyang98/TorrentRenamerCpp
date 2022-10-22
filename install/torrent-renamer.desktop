@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Torrent Renamer
+Comment=Renames torrent files in a directory
+Icon=application-x-lmms-project
+Exec=/home/fiendchain/Coding/Projects/cpp_torrent_renamer_build/run.sh  "/media/fiendchain/Storage v4/TV Shows"
+Path=/home/fiendchain/Coding/Projects/cpp_torrent_renamer_build
+Terminal=false
+Categories=X-GNOME-Other;

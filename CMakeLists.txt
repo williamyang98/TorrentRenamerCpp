@@ -1,86 +1,71 @@
 cmake_minimum_required(VERSION 3.10)
 project(TorrentRenamer)
 
-list(APPEND VCPKG_FEATURE_FLAGS "versions")
+option(RAPIDJSON_BUILD_DOC "" OFF)
+option(RAPIDJSON_BUILD_EXAMPLES "" OFF)
+option(RAPIDJSON_BUILD_TESTS "" OFF)
+option(RAPIDJSON_BUILD_THIRDPARTY_GTEST "" OFF)
 
-find_package(cpr CONFIG REQUIRED)
-find_package(RapidJSON CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
+option(GLFW_BUILD_EXAMPLES "" OFF)
+option(GLFW_BUILD_TESTS "" OFF)
+option(GLFW_BUILD_DOCS "" OFF)
+option(GLFW_INSTALL "" OFF)
 
-set(VENDOR_DIR ${CMAKE_SOURCE_DIR}/vendor)
-set(imgui_docking_DIR ${VENDOR_DIR}/imgui_docking)
-find_package(imgui_docking CONFIG REQUIRED)
+option(SPDLOG_FMT_EXTERNAL "" ON)
 
+add_subdirectory(vendor/rapidjson)
+add_subdirectory(vendor/fmt)
+add_subdirectory(vendor/spdlog)
+add_subdirectory(vendor/cpr)
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
+include_directories(vendor/rapidjson/include)
 
-set(TVDB_API_FILES 
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+find_package(imgui REQUIRED)
+#find_package(cpr REQUIRED)
+#find_package(RapidJSON REQUIRED)
+#find_package(fmt REQUIRED)
+#find_package(spdlog REQUIRED)
+
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /fsanitize=address")
+# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /fsanitize=address")
+
+set(SRC_FILES 
     src/tvdb_api/tvdb_api.cpp
     src/tvdb_api/tvdb_api_schema.cpp
     src/tvdb_api/tvdb_json.cpp
-)
-
-set(CORE_FILES
     src/renaming/se_regex.cpp
     src/renaming/managed_folder.cpp
     src/renaming/scanner.cpp
     # we need template definition in header file for linker to work
     # src/renaming/renamer.cpp
-)
-
-set(APP_FILES
     src/app/app.cpp
     src/app/app_folder.cpp
     src/app/app_config.cpp
     src/app/app_credentials_schema.cpp
     src/util/file_loading.cpp
+    src/os_dep.cpp
 )
 
 set(GUI_FILES
     src/gui/gui_ext.cpp)
 
-# static library for tvdb api
-add_library(tvdb_api STATIC ${TVDB_API_FILES})
-include_directories(tvdb_api src/)
-set_target_properties(tvdb_api PROPERTIES CXX_STANDARD 20)
-target_compile_options(tvdb_api PRIVATE "/MP")
-target_link_libraries(tvdb_api PRIVATE 
-    cpr::cpr rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
-
-# static library for renaming code
-add_library(core STATIC ${CORE_FILES})
-include_directories(core src/)
-set_target_properties(core PROPERTIES CXX_STANDARD 20)
-target_compile_options(core PRIVATE "/MP")
-target_link_libraries(core PUBLIC 
-    rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
-
-# static library for gui application model
-add_library(app STATIC ${APP_FILES})
-include_directories(app src/)
-set_target_properties(app PROPERTIES CXX_STANDARD 20)
-target_compile_options(app PRIVATE "/MP")
-target_link_libraries(app PUBLIC 
-    rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
-
 # test a pure cli application
-add_executable(cli_test src/main_cli_test.cpp)
+add_executable(cli_test src/main_cli_test.cpp ${SRC_FILES})
 include_directories(cli_test src/)
 set_target_properties(cli_test PROPERTIES CXX_STANDARD 20)
-set_target_properties(cli_test PROPERTIES CXX_STANDARD 20)
 target_link_libraries(cli_test PRIVATE 
-    tvdb_api core app
-    rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only)
-target_compile_options(cli_test PRIVATE "/MP")
+    cpr::cpr fmt::fmt spdlog::spdlog)
 
 # imgui implementation of gui application
-add_executable(main src/main_gui.cpp ${GUI_FILES})
+add_executable(main src/main_gui.cpp ${GUI_FILES} ${SRC_FILES})
 include_directories(main src/)
 set_target_properties(main PROPERTIES CXX_STANDARD 20)
 target_link_libraries(main PRIVATE 
-    tvdb_api core app
-    rapidjson fmt::fmt spdlog::spdlog spdlog::spdlog_header_only 
-    imgui_docking "d3d11.lib" "dxgi.lib" "d3dcompiler.lib")
+    cpr::cpr fmt::fmt spdlog::spdlog)
+target_link_libraries(main PUBLIC imgui)
+
+if (WIN32)
+target_compile_options(cli_test PRIVATE "/MP")
 target_compile_options(main PRIVATE "/MP")
+endif (WIN32)

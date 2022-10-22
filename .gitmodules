@@ -1,3 +1,19 @@
-[submodule "vendor/imgui_docking"]
-	path = vendor/imgui_docking
-	url = https://github.com/FiendChain/imgui_docking_cmake.git
+[submodule "vendor/imgui"]
+	path = vendor/imgui
+	url = https://github.com/ocornut/imgui.git
+        branch = docking
+[submodule "vendor/fmt"]
+	path = vendor/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "vendor/glfw"]
+	path = vendor/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "vendor/rapidjson"]
+	path = vendor/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
+[submodule "vendor/spdlog"]
+	path = vendor/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "vendor/cpr"]
+	path = vendor/cpr
+        url = https://github.com/libcpr/cpr.git
