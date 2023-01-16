@@ -6,3 +6,14 @@ A torrent renaming tool built in C++
 
 # Preview
 ![Main window](docs/screenshot_v1.png)
+
+## Credentials
+For both the gui app and cli scripts, you need to supply your TVDB api credentials. 
+See "res/example-credentials.json" for the json template.
+The default path that is read is "credentials.json".
+
+### Getting credentials from dashboard
+You can check out the [tvdb dashboard](https://thetvdb.com/dashboard) for your api information. This is required for performing api requests.
+
+![alt text](docs/credentials_user_v2.png "Username and userkey in dashboard")
+![alt text](docs/credentials_api_v2.png "Apikey in dashboard")
