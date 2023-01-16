@@ -25,10 +25,10 @@ struct FileIntent {
 };
 
 struct FilterRules {
-    std::vector<std::string> blacklist_extensions;
-    std::vector<std::string> whitelist_folders;
-    std::vector<std::string> whitelist_files;
-    std::vector<std::string> whitelist_tags;
+    std::vector<std::string> blacklist_extensions;  // delete these extensions
+    std::vector<std::string> whitelist_folders;     // whitelist files in these folders
+    std::vector<std::string> whitelist_files;       // whitelist files with these names
+    std::vector<std::string> whitelist_tags;        // keep these tags in filename
 };
 
 FileIntent get_file_intent(
