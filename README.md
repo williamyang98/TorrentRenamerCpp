@@ -5,7 +5,7 @@ A torrent renaming tool built in C++
 - Deletes blacklisted extensions
 
 # Preview
-![Main window](docs/screenshot_v1.png)
+![Main window](docs/screenshot_v2.png)
 
 ## Credentials
 For both the gui app and cli scripts, you need to supply your TVDB api credentials. 
