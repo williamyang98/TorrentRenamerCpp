@@ -12,17 +12,15 @@
 #include <filesystem>
 
 #define PROFILE_ENABLED 0
-#include "util/Instrumentor.h"
 #include "util/console_colours.h"
 
-#include "app/app_credentials_schema.h"
+#include "app/app_schemas.h"
+#include "app/file_intents.h"
+#include "app/app_folder_state.h"
 #include "tvdb_api/tvdb_api.h"
 #include "tvdb_api/tvdb_api_schema.h"
 #include "tvdb_api/tvdb_models.h"
 #include "tvdb_api/tvdb_json.h"
-#include "renaming/scanner.h"
-#include "renaming/file_intent.h"
-#include "renaming/managed_folder.h"
 #include "util/file_loading.h"
 
 namespace fs = std::filesystem;
@@ -47,9 +45,6 @@ int main(int argc, char** argv) {
 
     util::write_json_to_stream(cred_doc, std::cout);
 
-    // Instrumentor::Get().BeginSession("Renaming");
-
-    // const char *fn = "D:/TV Shows/Air Crash Investigation (Mayday) (2003)/";
     const fs::path root(argv[1]);
 
     if (argc == 2) {
@@ -62,8 +57,6 @@ int main(int argc, char** argv) {
     } else {
         scan_directory(root);
     }
-
-    // Instrumentor::Get().EndSession();
 
     return 0;
 }
@@ -146,17 +139,18 @@ void scan_directory(const fs::path &subdir) {
     auto series_cache   = tvdb_api::load_series_info(series_info);
     auto episodes_cache = tvdb_api::load_series_episodes_info(episodes_info);
 
-    tvdb_api::TVDB_Cache tvdb_cache { series_cache, episodes_cache };
+    auto tvdb_cache = tvdb_api::TVDB_Cache{ series_cache, episodes_cache };
 
-    app::RenamingConfig cfg;
+    auto cfg = app::FilterRules();
     cfg.blacklist_extensions.push_back("nfo");
     cfg.blacklist_extensions.push_back("ext");
 
     cfg.whitelist_folders.push_back("Extras");
 
-    auto folder = app::ManagedFolder();
-    for (auto intent: app::scan_directory(subdir, tvdb_cache, cfg)) {
-        folder.AddIntent(intent);
+    auto folder = app::AppFolderState();
+    auto intents = app::get_directory_file_intents(subdir, cfg, tvdb_cache);
+    for (auto intent: intents) {
+        folder.AddIntent(std::move(intent));
     }
 
     auto &counts = folder.GetActionCount();

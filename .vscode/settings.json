@@ -36,7 +36,9 @@
         "xutility": "cpp",
         "bit": "cpp",
         "compare": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "typeindex": "cpp",
+        "unordered_map": "cpp"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

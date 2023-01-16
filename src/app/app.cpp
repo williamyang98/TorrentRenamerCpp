@@ -7,13 +7,12 @@
 #include <mutex>
 #include <thread>
 #include <functional>
-#include <ranges>
 #include <memory>
 
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
 
-#include "app_credentials_schema.h"
+#include "app_schemas.h"
 #include "app_config.h"
 #include "app_folder.h"
 
@@ -39,22 +38,22 @@ m_thread_pool.resize(num_threads);
         auto cfg = load_app_config_from_filepath(config_filepath);
 
         // setup our renaming config
-        for (auto &v: cfg.blacklist_extensions) {
+        for (auto& v: cfg.blacklist_extensions) {
             m_cfg.blacklist_extensions.push_back(v);
         }
-        for (auto &v: cfg.whitelist_folders) {
+        for (auto& v: cfg.whitelist_folders) {
             m_cfg.whitelist_folders.push_back(v);
         }
-        for (auto &v: cfg.whitelist_filenames) {
+        for (auto& v: cfg.whitelist_filenames) {
             m_cfg.whitelist_files.push_back(v);
         }
-        for (auto &v: cfg.whitelist_tags) {
+        for (auto& v: cfg.whitelist_tags) {
             m_cfg.whitelist_tags.push_back(v);
         }
 
         m_credentials_filepath = cfg.credentials_filepath;
         authenticate();
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
         queue_app_error(e.what());
     }
 }
@@ -70,7 +69,7 @@ void App::authenticate() {
         return;
     }
 
-    auto &cred_doc = cred_res.doc;
+    auto& cred_doc = cred_res.doc;
 
     if (!util::validate_document(cred_doc, CREDENTIALS_SCHEMA)) {
         auto err = fmt::format("Credentials file is in the wrong format ({})", cred_fp);
@@ -106,14 +105,14 @@ void App::refresh_folders() {
     m_current_folder = nullptr;
 
     try {
-        for (auto &subdir: fs::directory_iterator(m_root)) {
+        for (auto& subdir: fs::directory_iterator(m_root)) {
             if (!subdir.is_directory()) {
                 continue;
             }
-            auto folder = std::make_shared<SeriesFolder>(subdir, m_cfg, m_global_busy_count);
-            m_folders.push_back(std::move(folder));
+            auto folder = std::make_shared<AppFolder>(subdir, m_cfg, m_global_busy_count);
+            m_folders.push_back(folder);
         }
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
         queue_app_error(e.what());
     }
 }
@@ -124,19 +123,19 @@ void App::queue_async_call(std::function<void (int)> call) {
     m_thread_pool.push([call, this](int pid) {
         try {
             call(pid);
-        } catch (std::exception &e) {
+        } catch (std::exception& e) {
             queue_app_error(e.what());
         }
     });
 }
 
 // mutex protected addition of error
-void App::queue_app_error(const std::string &error) {
+void App::queue_app_error(const std::string& error) {
     auto lock = std::scoped_lock(m_app_errors_mutex);
     m_app_errors.push_back(error);
 }
 
-void App::queue_app_warning(const std::string &warning) {
+void App::queue_app_warning(const std::string& warning) {
     auto lock = std::scoped_lock(m_app_warnings_mutex);
     m_app_warnings.push_back(warning);
 }

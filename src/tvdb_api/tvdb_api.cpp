@@ -22,7 +22,7 @@ namespace tvdb_api
 /* #define BASE_URL "https://api.thetvdb.com/" */
 #define BASE_URL "http://api.thetvdb.com/"
 
-void validate_response(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {
+void validate_response(const rapidjson::Document& doc, rapidjson::SchemaDocument& schema_doc) {
     rapidjson::SchemaValidator validator(schema_doc);
     if (doc.Accept(validator)) {
         return;
@@ -158,9 +158,9 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     rapidjson::Document combined_doc;
     combined_doc.SetArray();
 
-    auto add_episodes = [&combined_doc](rapidjson::Document &doc) {
+    auto add_episodes = [&combined_doc](rapidjson::Document& doc) {
         auto episodes_data = doc["data"].GetArray();
-        for (auto &ep_data: episodes_data) {
+        for (auto& ep_data: episodes_data) {
             rapidjson::Value ep_copy;
             ep_copy.CopyFrom(ep_data, combined_doc.GetAllocator()) ;
             combined_doc.PushBack(ep_copy, combined_doc.GetAllocator());
@@ -177,7 +177,7 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     }
     add_episodes(doc);
     
-    auto &links = doc["links"];
+    auto& links = doc["links"];
     if (!(links["next"].IsInt() && links["last"].IsInt())) {
         return combined_doc;
     }

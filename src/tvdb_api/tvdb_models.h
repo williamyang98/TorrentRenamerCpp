@@ -39,7 +39,7 @@ struct EpisodeKey {
         return (season * (1 << 16)) + episode;
     }
 
-    bool operator ==(const EpisodeKey &rhs) const {
+    bool operator ==(const EpisodeKey& rhs) const {
         return GetHash() == rhs.GetHash();
     }
 };

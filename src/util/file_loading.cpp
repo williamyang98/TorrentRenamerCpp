@@ -34,7 +34,7 @@ rapidjson::SchemaDocument load_schema_from_cstr(const char *cstr) {
     return schema;
 }
 
-bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc) {
+bool validate_document(const rapidjson::Document& doc, rapidjson::SchemaDocument& schema_doc) {
     rapidjson::SchemaValidator validator(schema_doc);
     if (!doc.Accept(validator)) {
         spdlog::error("Doc doesn't match schema");
@@ -82,7 +82,7 @@ DocumentLoadResult load_document_from_file(const char *fn) {
     return res;
 }
 
-void write_json_to_stream(const rapidjson::Document &doc, std::ostream &os) {
+void write_json_to_stream(const rapidjson::Document& doc, std::ostream& os) {
     rapidjson::StringBuffer sb;
     rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
     writer.SetIndent(' ', 1);
@@ -91,7 +91,7 @@ void write_json_to_stream(const rapidjson::Document &doc, std::ostream &os) {
     os << sb.GetString() << std::endl;
 }
 
-bool write_document_to_file(const char *fn, const rapidjson::Document &doc) {
+bool write_document_to_file(const char *fn, const rapidjson::Document& doc) {
     std::ofstream file(fn);
     if (!file.is_open()) {
         return false;

@@ -104,7 +104,7 @@ std::optional<std::string> open_folder_dialog(void) {
 }
 #endif
 
-void open_folder(const std::string &path) {
+void open_folder(const std::string& path) {
     #ifdef _WIN32
     ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOW);
     #endif
@@ -114,7 +114,7 @@ void open_folder(const std::string &path) {
     #endif
 }
 
-void open_file(const std::string &path) {
+void open_file(const std::string& path) {
     #ifdef _WIN32
     ShellExecuteA(NULL, "open", path.c_str(), NULL, NULL, SW_SHOW);
     #endif
