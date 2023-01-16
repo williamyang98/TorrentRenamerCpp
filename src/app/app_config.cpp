@@ -6,48 +6,10 @@
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
 
+#include "app_schemas.h"
 #include "util/file_loading.h"
 
 namespace app {
-
-const char *APP_CONFIG_SCHEMA = 
-R"({
-    "title": "app config",
-    "descripton": "Config file for gui app",
-    "type": "object",
-    "properties": {
-        "credentials_file": {
-            "type": "string"
-        },
-        "whitelist_folders": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "whitelist_filenames": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "blacklist_extensions": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "whitelist_tags": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        }
-    },
-    "required": ["credentials_file"]
-})";
-
-extern rapidjson::SchemaDocument APP_SCHEMA_DOC = util::load_schema_from_cstr(APP_CONFIG_SCHEMA);
 
 AppConfig load_app_config_from_filepath(const char *filename) {
     auto load_result = util::load_document_from_file(filename);
@@ -57,20 +19,20 @@ AppConfig load_app_config_from_filepath(const char *filename) {
         throw std::runtime_error(err);
     }
 
-    auto doc = std::move(load_result.doc);
+    auto& doc = load_result.doc;
     if (!util::validate_document(doc, APP_SCHEMA_DOC)) {
         auto err = fmt::format("App config file ({}) has invalid format", filename); 
         spdlog::critical(err);
         throw std::runtime_error(err);
     }
 
-    auto load_string_list = [](rapidjson::Document &doc, const char *key) {
+    auto load_string_list = [](rapidjson::Document& doc, const char *key) {
         std::vector<std::string> vec;
         if (!doc.HasMember(key)) {
             return vec;
         }
-        const auto &v = doc[key].GetArray();
-        for (auto &e: v) {
+        const auto& v = doc[key].GetArray();
+        for (auto& e: v) {
             vec.push_back(e.GetString());
         }
         return vec;

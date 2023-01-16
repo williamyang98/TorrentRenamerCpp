@@ -16,7 +16,7 @@ namespace util
 rapidjson::SchemaDocument load_schema_from_cstr(const char *cstr);
 
 // use validation schema and log any errors 
-bool validate_document(const rapidjson::Document &doc, rapidjson::SchemaDocument &schema_doc);
+bool validate_document(const rapidjson::Document& doc, rapidjson::SchemaDocument& schema_doc);
 
 // reading and writing json documents
 enum DocumentLoadCode {
@@ -28,7 +28,7 @@ struct DocumentLoadResult {
 };
 DocumentLoadResult load_document_from_file(const char *fn);
 
-void write_json_to_stream(const rapidjson::Document &doc, std::ostream &os);
-bool write_document_to_file(const char *fn, const rapidjson::Document &doc);
+void write_json_to_stream(const rapidjson::Document& doc, std::ostream& os);
+bool write_document_to_file(const char *fn, const rapidjson::Document& doc);
 
 };

@@ -12,9 +12,9 @@
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 #include "gui/imgui_skeleton.h"
-#include "gui/gui_ext.h"
 #include "gui/font_awesome_definitions.h"
 #include "gui/imgui_config.h"
+#include "gui/render_app.h"
 
 // if we are on windows, we need to startup some win32 event loop stuff
 #if defined(_WIN32)

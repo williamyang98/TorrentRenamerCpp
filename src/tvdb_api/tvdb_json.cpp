@@ -6,8 +6,8 @@
 namespace tvdb_api {
 
 // for all loading checks, refer to the schema file (schema.json) for structure of document
-SeriesInfo load_series_info(const rapidjson::Document &doc) {
-    auto get_string_default = [](const rapidjson::Value &v) {
+SeriesInfo load_series_info(const rapidjson::Document& doc) {
+    auto get_string_default = [](const rapidjson::Value& v) {
         return v.IsString() ? v.GetString() : "";
     };
 
@@ -19,15 +19,15 @@ SeriesInfo load_series_info(const rapidjson::Document &doc) {
     return series;
 }
 
-EpisodesMap load_series_episodes_info(const rapidjson::Document &doc) {
+EpisodesMap load_series_episodes_info(const rapidjson::Document& doc) {
     auto episodes = EpisodesMap();
     auto data = doc.GetArray();
 
-    auto get_string_default = [](const rapidjson::Value &v) {
+    auto get_string_default = [](const rapidjson::Value& v) {
         return v.IsString() ? v.GetString() : "";
     };
 
-    for (auto &e: data) {
+    for (auto& e: data) {
         EpisodeInfo ep;
         ep.id = e["id"].GetUint();
         ep.season = e["airedSeason"].GetInt();
@@ -44,13 +44,13 @@ EpisodesMap load_series_episodes_info(const rapidjson::Document &doc) {
 }
 
 
-std::vector<SeriesInfo> load_search_info(const rapidjson::Document &doc) {
+std::vector<SeriesInfo> load_search_info(const rapidjson::Document& doc) {
     std::vector<SeriesInfo> series;
 
     auto data = doc.GetArray();
     series.reserve(data.Size());
 
-    for (auto &s: data) {
+    for (auto& s: data) {
         SeriesInfo o;
         o.name = s["seriesName"].GetString();
         o.air_date = s["firstAired"].GetString();
