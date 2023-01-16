@@ -33,7 +33,7 @@ FileIntent get_file_intent(
 
     for (auto& blacklist_ext: rules.blacklist_extensions) {
         if (ext.compare(blacklist_ext) == 0) {
-            intent.action = FileIntent::Action::IGNORE;
+            intent.action = FileIntent::Action::DELETE;
             return intent;
         }
     }

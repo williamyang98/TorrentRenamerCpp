@@ -16,11 +16,14 @@
 #include "tvdb_api.h"
 #include "tvdb_api_schema.h"
 
+constexpr int HTTP_CODE_OK = 200;
+
+// NOTE: HTTPS requires extra work which I don't know how to do
+// #define BASE_URL "https://api.thetvdb.com/"
+#define BASE_URL "http://api.thetvdb.com/"
+
 namespace tvdb_api 
 {
-
-/* #define BASE_URL "https://api.thetvdb.com/" */
-#define BASE_URL "http://api.thetvdb.com/"
 
 void validate_response(const rapidjson::Document& doc, rapidjson::SchemaDocument& schema_doc) {
     rapidjson::SchemaValidator validator(schema_doc);
@@ -66,7 +69,7 @@ std::optional<std::string> login(const char *apikey, const char *userkey, const 
 
     spdlog::debug(fmt::format("Got response code {} on login", r.status_code));
 
-    if (r.status_code != 200) {
+    if (r.status_code != HTTP_CODE_OK) {
         return {};
     }
 
@@ -88,7 +91,7 @@ bool refresh_token(const char *token) {
         create_token_header(token)
     );
 
-    return (r.status_code == 200);
+    return (r.status_code == HTTP_CODE_OK);
 }
 
 std::optional<rapidjson::Document> search_series(const char *name, const char *token) {
@@ -98,7 +101,7 @@ std::optional<rapidjson::Document> search_series(const char *name, const char *t
         cpr::Parameters{{"name", name}}
     );
 
-    if (r.status_code != 200) {
+    if (r.status_code != HTTP_CODE_OK) {
         return {};
     }
 
@@ -122,7 +125,7 @@ std::optional<rapidjson::Document> get_series(sid_t id, const char *token) {
         create_token_header(token)
     );
 
-    if (r.status_code != 200) {
+    if (r.status_code != HTTP_CODE_OK) {
         return {};
     }
 
@@ -151,7 +154,7 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
     };
 
     auto r = get_page(1);
-    if (r.status_code != 200) {
+    if (r.status_code != HTTP_CODE_OK) {
         return {};
     }
 
@@ -187,7 +190,7 @@ std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *tok
 
     for (int i = next_page; i <= last_page; i++) {
         auto r0 = get_page(i);
-        if (r0.status_code != 200) {
+        if (r0.status_code != HTTP_CODE_OK) {
             spdlog::critical("Request failed in middle of page loading for episodes data");
             throw std::runtime_error("Request failed in middle of page loading for episodes data");
         }

@@ -5,7 +5,7 @@
 
 namespace tvdb_api {
 
-// for all loading checks, refer to the schema file (schema.json) for structure of document
+// for all loading checks, refer to the schema file (tvdb_api_schema.cpp) for structure of document
 SeriesInfo load_series_info(const rapidjson::Document& doc) {
     auto get_string_default = [](const rapidjson::Value& v) {
         return v.IsString() ? v.GetString() : "";
