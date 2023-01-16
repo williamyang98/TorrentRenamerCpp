@@ -1,17 +1,16 @@
 #include "app_config.h"
-
-#include <rapidjson/document.h>
-#include <rapidjson/schema.h>
-
-#include <spdlog/spdlog.h>
-#include <fmt/core.h>
-
 #include "app_schemas.h"
 #include "util/file_loading.h"
 
-namespace app {
+#include <rapidjson/document.h>
+#include <rapidjson/schema.h>
+#include <spdlog/spdlog.h>
+#include <fmt/core.h>
 
-AppConfig load_app_config_from_filepath(const char *filename) {
+namespace app 
+{
+
+AppConfig load_app_config_from_filepath(const char* filename) {
     auto load_result = util::load_document_from_file(filename);
     if (load_result.code != util::DocumentLoadCode::OK) {
         auto err = fmt::format("Failed to load app config json from: {}", filename);
@@ -26,7 +25,7 @@ AppConfig load_app_config_from_filepath(const char *filename) {
         throw std::runtime_error(err);
     }
 
-    auto load_string_list = [](rapidjson::Document& doc, const char *key) {
+    auto load_string_list = [](rapidjson::Document& doc, const char* key) {
         std::vector<std::string> vec;
         if (!doc.HasMember(key)) {
             return vec;

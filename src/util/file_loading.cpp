@@ -18,7 +18,7 @@
 
 namespace util {
 
-rapidjson::SchemaDocument load_schema_from_cstr(const char *cstr) {
+rapidjson::SchemaDocument load_schema_from_cstr(const char* cstr) {
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(cstr);
     if (!ok) {
@@ -55,7 +55,7 @@ bool validate_document(const rapidjson::Document& doc, rapidjson::SchemaDocument
     return true;
 }
 
-DocumentLoadResult load_document_from_file(const char *fn) {
+DocumentLoadResult load_document_from_file(const char* fn) {
     DocumentLoadResult res;
 
     std::ifstream file(fn);
@@ -91,7 +91,7 @@ void write_json_to_stream(const rapidjson::Document& doc, std::ostream& os) {
     os << sb.GetString() << std::endl;
 }
 
-bool write_document_to_file(const char *fn, const rapidjson::Document& doc) {
+bool write_document_to_file(const char* fn, const rapidjson::Document& doc) {
     std::ofstream file(fn);
     if (!file.is_open()) {
         return false;

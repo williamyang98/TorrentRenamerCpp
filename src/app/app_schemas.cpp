@@ -4,7 +4,7 @@
 namespace app
 {
 
-const char *APP_CONFIG_SCHEMA = 
+const char* APP_CONFIG_SCHEMA = 
 R"({
     "title": "app config",
     "descripton": "Config file for gui app",
@@ -41,7 +41,7 @@ R"({
     "required": ["credentials_file"]
 })";
 
-const char *CREDENTIALS_SCHEMA_STR =
+const char* CREDENTIALS_SCHEMA_STR =
 R"({
     "title": "tvdb credentials",
     "description": "TVDB credentials file",
@@ -63,7 +63,7 @@ R"({
     "required": ["credentials"]
 })";
 
-extern rapidjson::SchemaDocument APP_SCHEMA_DOC = util::load_schema_from_cstr(APP_CONFIG_SCHEMA);
-extern rapidjson::SchemaDocument CREDENTIALS_SCHEMA = util::load_schema_from_cstr(CREDENTIALS_SCHEMA_STR);
+rapidjson::SchemaDocument APP_SCHEMA_DOC = util::load_schema_from_cstr(APP_CONFIG_SCHEMA);
+rapidjson::SchemaDocument CREDENTIALS_SCHEMA = util::load_schema_from_cstr(CREDENTIALS_SCHEMA_STR);
 
 };

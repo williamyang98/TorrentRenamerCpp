@@ -27,7 +27,7 @@ static void RenderSeriesList(App& main_app);
 static void RenderSeriesSelectModal(App& main_app, AppFolder& folder);
 static void RenderEpisodes(App& main_app);
 static void RenderEpisodesGenericList(
-    AppFolder& folder, const char *table_id, FileIntent::Action action, 
+    AppFolder& folder, const char* table_id, FileIntent::Action action, 
     ImGuiTextFilter& search_filter,
     int& selected_idx);
 static void RenderFilesComplete(AppFolder& folder);
@@ -36,7 +36,7 @@ static void RenderFilesRename(AppFolder& folder);
 static void RenderFilesDelete(AppFolder& folder);
 static void RenderFilesConflict(AppFolder& folder);
 static void RenderFilesWhitelist(AppFolder& folder);
-static void RenderFileIntentChange(AppFolder& folder, AppFileState& intent, const char *label);
+static void RenderFileIntentChange(AppFolder& folder, AppFileState& intent, const char* label);
 static void RenderCacheInfo(App& main_app);
 static void RenderErrors(App& main_app);
 static void RenderAppWarnings(App& main_app);
@@ -250,7 +250,7 @@ void RenderSeriesList(App& main_app) {
     ImGui::End();
 }
 
-void RenderFileIntentChange(AppFolder& folder, AppFileState& intent, const char *label) {
+void RenderFileIntentChange(AppFolder& folder, AppFileState& intent, const char* label) {
     if (ImGui::BeginPopupContextItem()) {
         if (ImGui::Selectable("Open folder")) {
             folder.open_folder(intent.GetSrc());
@@ -280,7 +280,7 @@ void RenderEpisodes(App& main_app) {
     }
     
     // if the selected folder changed, we reset the filters
-    static AppFolder *prev_folder = nullptr;
+    static AppFolder* prev_folder = nullptr;
     if (prev_folder != main_app.m_current_folder.get()) {
         CategoryFilters.ClearAll();
         CategorySelectedIndex.ClearAll();
@@ -391,7 +391,7 @@ void RenderEpisodes(App& main_app) {
 }
 
 void RenderEpisodesGenericList(
-        AppFolder& folder, const char *table_id, FileIntent::Action action, 
+        AppFolder& folder, const char* table_id, FileIntent::Action action, 
         ImGuiTextFilter& search_filter,
         int& selected_idx) 
 {
@@ -409,7 +409,7 @@ void RenderEpisodesGenericList(
         int i = 0;
         for (auto& [key, intent]: state->GetIntents()) {
             if (intent.GetAction() != action) continue; 
-            const char *name = intent.GetSrc().c_str(); 
+            const char* name = intent.GetSrc().c_str(); 
             if (!search_filter.PassFilter(name)) {
                 continue;
             }
@@ -423,7 +423,7 @@ void RenderEpisodesGenericList(
 
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
-            const char *popup_key = "##intent action popup";
+            const char* popup_key = "##intent action popup";
             const bool is_selected = (i == selected_idx);
             if (ImGui::Selectable(name, is_selected)) {
                 if (is_selected) {
@@ -495,8 +495,8 @@ void RenderFilesRename(AppFolder& folder) {
         for (auto& [key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::RENAME) continue; 
 
-            const char *src_name = intent.GetSrc().c_str();
-            const char *dest_name = intent.GetDest().c_str();
+            const char* src_name = intent.GetSrc().c_str();
+            const char* dest_name = intent.GetDest().c_str();
             if (!search_filter.PassFilter(src_name) &&
                 !search_filter.PassFilter(dest_name))
             {
@@ -527,7 +527,7 @@ void RenderFilesRename(AppFolder& folder) {
             }
             ImGui::PopItemWidth();
 
-            const char *popup_id = "##intent action popup";
+            const char* popup_id = "##intent action popup";
             ImGui::SameLine();
             const bool is_selected = (row_id == selected_idx);
             if (ImGui::Selectable("###row popup button", is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
@@ -582,8 +582,8 @@ void RenderFilesDelete(AppFolder& folder) {
         for (auto& [key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::DELETE) continue; 
 
-            const char *src_name = intent.GetSrc().c_str();
-            const char *dest_name = intent.GetDest().c_str();
+            const char* src_name = intent.GetSrc().c_str();
+            const char* dest_name = intent.GetDest().c_str();
             if (!search_filter.PassFilter(src_name) &&
                 !search_filter.PassFilter(dest_name))
             {
@@ -609,7 +609,7 @@ void RenderFilesDelete(AppFolder& folder) {
             ImGui::TextWrapped(intent.GetSrc().c_str());
             ImGui::SameLine();
 
-            const char *popup_id = "##intent action popup";
+            const char* popup_id = "##intent action popup";
             const bool is_selected = (i == selected_idx);
             if (ImGui::Selectable("##action popup row", false, ImGuiSelectableFlags_SpanAllColumns)) {
                 if (is_selected) {
@@ -732,6 +732,8 @@ void RenderCacheInfo(App& main_app) {
         ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | 
         ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
 
+    auto& series = cache.series;
+
     if (ImGui::BeginTable("Series", 2, flags)) {
         ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
@@ -741,25 +743,34 @@ void RenderCacheInfo(App& main_app) {
         ImGui::TableSetColumnIndex(0);
         ImGui::Text("Series ID"); 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextWrapped("%d", cache.series.id);
+        ImGui::TextWrapped("%d", series.id);
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::Text("Name"); 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextWrapped("%s", cache.series.name.c_str());
+        ImGui::TextWrapped("%s", series.name.c_str());
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::Text("Status"); 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextWrapped("%s", cache.series.status.c_str());
+        ImGui::TextWrapped("%s", series.status.c_str());
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::Text("Air Date"); 
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextWrapped("%s", cache.series.air_date.c_str());
+        ImGui::TextWrapped("%s", series.air_date.c_str());
+
+        if (series.overview) {
+            auto& label = series.overview.value();
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("Overview"); 
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("%s", label.c_str());
+        }
 
         ImGui::EndTable();
     }
@@ -804,7 +815,7 @@ void RenderErrors(App& main_app) {
 }
 
 void RenderSeriesSelectModal(App& main_app, AppFolder& folder) {
-    static const char *modal_title = "Select a series###series selection modal";
+    static const char* modal_title = "Select a series###series selection modal";
 
     if (ImGui::Button("Select Series")) {
         ImGui::OpenPopup(modal_title);
@@ -815,7 +826,7 @@ void RenderSeriesSelectModal(App& main_app, AppFolder& folder) {
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
     static char search_string[256] = {0};
-    const char *buf = (const char *)(&search_string[0]);
+    const char* buf = (const char*)(&search_string[0]);
 
     bool is_modal_open = true;
 
@@ -912,7 +923,7 @@ void RenderAppWarnings(App& main_app) {
 }
 
 void RenderAppErrors(App& main_app) {
-    static const char *modal_title = "Application error###app error modal";
+    static const char* modal_title = "Application error###app error modal";
 
     std::scoped_lock error_lock(main_app.m_app_errors_mutex); 
     auto& errors = main_app.m_app_errors;

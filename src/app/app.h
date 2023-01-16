@@ -39,7 +39,7 @@ private:
     ctpl::thread_pool m_thread_pool;
     std::atomic<int> m_global_busy_count;
 public:
-    App(const char *config_filepath);
+    App(const char* config_filepath);
     void authenticate();
     void refresh_folders();
     int get_folder_busy_count() { return m_global_busy_count; }

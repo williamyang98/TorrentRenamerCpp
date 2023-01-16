@@ -9,7 +9,7 @@
 
 namespace tvdb_api {
 
-rapidjson::SchemaDocument load_schema_from_cstr(const char *cstr) {
+rapidjson::SchemaDocument load_schema_from_cstr(const char* cstr) {
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(cstr);
     if (!ok) {
@@ -25,7 +25,7 @@ rapidjson::SchemaDocument load_schema_from_cstr(const char *cstr) {
     return schema;
 }
 
-const char *SEARCH_DATA_SCHEMA_STR =
+const char* SEARCH_DATA_SCHEMA_STR =
 R"({
     "title": "tvdb search data",
     "description": "TVDB search data",
@@ -36,13 +36,14 @@ R"({
         "id": { "type": "number", "exclusiveMinimum": 0 },
         "seriesName": { "type": "string" },
         "firstAired": { "type": "string" },
-        "status": { "type": "string" }
-        },
-        "required": ["id", "seriesName", "firstAired", "status"]
+        "status": { "type": "string" },
+        "overview": { "type": "string" }
+    },
+    "required": ["id", "seriesName", "firstAired", "status"]
     }
 })";
 
-const char *SERIES_DATA_SCHEMA_STR =
+const char* SERIES_DATA_SCHEMA_STR =
 R"({
     "title": "tvdb series data",
     "description": "TVDB series data",
@@ -51,12 +52,13 @@ R"({
         "id": { "type": "number", "exclusiveMinimum": 0 },
         "seriesName": { "type": "string" },
         "firstAired": { "type": "string" },
-        "status": { "type": "string" }
+        "status": { "type": "string" },
+        "overview": { "type": "string" }
     },
     "required": ["id", "seriesName", "firstAired", "status"]
 })";
   
-const char *EPISODES_DATA_SCHEMA_STR =
+const char* EPISODES_DATA_SCHEMA_STR =
 R"({
     "title": "tvdb episodes data",
     "description": "An array of objects for each episode of a series",
@@ -74,7 +76,7 @@ R"({
     }
 })";
 
-extern rapidjson::SchemaDocument SEARCH_DATA_SCHEMA = load_schema_from_cstr(SEARCH_DATA_SCHEMA_STR);
-extern rapidjson::SchemaDocument SERIES_DATA_SCHEMA = load_schema_from_cstr(SERIES_DATA_SCHEMA_STR);
-extern rapidjson::SchemaDocument EPISODES_DATA_SCHEMA = load_schema_from_cstr(EPISODES_DATA_SCHEMA_STR);
+rapidjson::SchemaDocument SEARCH_DATA_SCHEMA = load_schema_from_cstr(SEARCH_DATA_SCHEMA_STR);
+rapidjson::SchemaDocument SERIES_DATA_SCHEMA = load_schema_from_cstr(SERIES_DATA_SCHEMA_STR);
+rapidjson::SchemaDocument EPISODES_DATA_SCHEMA = load_schema_from_cstr(EPISODES_DATA_SCHEMA_STR);
 };

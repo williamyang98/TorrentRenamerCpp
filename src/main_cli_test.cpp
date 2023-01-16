@@ -26,8 +26,8 @@
 namespace fs = std::filesystem;
 
 void scan_directory(const fs::path &subdir);
-void assert_validation(bool is_valid, const char *message);
-rapidjson::Document assert_document_load(util::DocumentLoadResult res, const char *message);
+void assert_validation(bool is_valid, const char* message);
+rapidjson::Document assert_document_load(util::DocumentLoadResult res, const char* message);
 
 int main(int argc, char** argv) {
     if (argc == 1) {
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-void assert_validation(bool is_valid, const char *message) {
+void assert_validation(bool is_valid, const char* message) {
     if (is_valid) { 
         return;
     }
@@ -69,7 +69,7 @@ void assert_validation(bool is_valid, const char *message) {
     exit(1);
 }
 
-rapidjson::Document assert_document_load(util::DocumentLoadResult res, const char *message) {
+rapidjson::Document assert_document_load(util::DocumentLoadResult res, const char* message) {
     if (res.code != util::DocumentLoadCode::OK) {
         std::cerr << "Failed to load document (" << message << ")" << std::endl;
         exit(1);

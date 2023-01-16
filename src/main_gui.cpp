@@ -68,8 +68,7 @@ public:
     }
 };
 
-// Main code
-int main(int argc, char **argv)
+int main(int argc, const char** argv)
 {
     auto logger = spdlog::basic_logger_mt("root", "logs.txt");
     spdlog::set_default_logger(logger);
@@ -86,10 +85,8 @@ int main(int argc, char **argv)
     
     int rv = 1;
     try {
-        const char *root_path = (argc > 1) ? argv[1] : NULL;
-        // create app after setting up the dx11 context
+        const char* root_path = (argc > 1) ? argv[1] : NULL;
         app::App main_app("res/app_config.json");
-
         if (root_path == NULL) {
             main_app.queue_app_warning("Please specify a filepath as an argument when starting the application");
         } else {

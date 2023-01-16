@@ -63,7 +63,7 @@ void AppFolder::push_error(const std::string& str) {
 }
 
 // thread safe load series search results from tvdb with validation
-bool AppFolder::load_search_series_from_tvdb(const char *name, const char *token) {
+bool AppFolder::load_search_series_from_tvdb(const char* name, const char* token) {
     if (m_is_busy) return false;
 
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
@@ -89,7 +89,7 @@ bool AppFolder::load_search_series_from_tvdb(const char *name, const char *token
 }
 
 // thread safe load series and episodes data from tvdb with validation, and store as cache
-bool AppFolder::load_cache_from_tvdb(uint32_t id, const char *token) {
+bool AppFolder::load_cache_from_tvdb(uint32_t id, const char* token) {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 

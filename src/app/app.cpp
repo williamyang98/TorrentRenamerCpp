@@ -12,8 +12,8 @@
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
 
-#include "app_schemas.h"
 #include "app_config.h"
+#include "app_credentials.h"
 #include "app_folder.h"
 
 #include "tvdb_api/tvdb_api.h"
@@ -26,7 +26,7 @@ namespace app
 
 namespace fs = std::filesystem;
 
-App::App(const char *config_filepath)
+App::App(const char* config_filepath)
 {
     const int num_threads = 1000;
 m_thread_pool.resize(num_threads);
@@ -60,38 +60,26 @@ m_thread_pool.resize(num_threads);
 
 // get a new token which can be used for a few hours
 void App::authenticate() {
-    auto cred_fp = m_credentials_filepath.c_str();
-    auto cred_res = util::load_document_from_file(cred_fp);
-    if (cred_res.code != util::DocumentLoadCode::OK) {
-        auto err = "Failed to load credentials file";
-        spdlog::error(err);
-        queue_app_error(err);
-        return;
-    }
-
-    auto& cred_doc = cred_res.doc;
-
-    if (!util::validate_document(cred_doc, CREDENTIALS_SCHEMA)) {
-        auto err = fmt::format("Credentials file is in the wrong format ({})", cred_fp);
-        spdlog::error(err);
-        queue_app_error(err);
-        return;
-    }
-
-    {
+    auto filepath = m_credentials_filepath.c_str();
+    
+    try {
+        auto credentials = load_credentials_from_filepath(filepath);
         auto res = tvdb_api::login(
-            cred_doc["credentials"]["apikey"].GetString(), 
-            cred_doc["credentials"]["userkey"].GetString(),
-            cred_doc["credentials"]["username"].GetString());
+            credentials.api_key.c_str(), 
+            credentials.user_key.c_str(),
+            credentials.username.c_str()
+        );
         
         if (!res) {
             spdlog::error("Failed to login");
-            /* queue_app_error("Failed to login"); */
             queue_app_warning("Failed to login");
             return;
         }
 
         m_token = res.value();
+
+    } catch (std::exception& e) {
+        queue_app_error(e.what());
     }
 }
 

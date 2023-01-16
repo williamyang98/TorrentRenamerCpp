@@ -45,11 +45,11 @@ void validate_response(const rapidjson::Document& doc, rapidjson::SchemaDocument
     throw std::runtime_error("tvdb api response failed to match schema");
 }
 
-cpr::Header create_token_header(const char *token) {
+cpr::Header create_token_header(const char* token) {
     return cpr::Header{{"Authorization", "Bearer " + std::string(token)}};
 }
 
-std::optional<std::string> login(const char *apikey, const char *userkey, const char *username) {
+std::optional<std::string> login(const char* apikey, const char* userkey, const char* username) {
     rapidjson::StringBuffer sb;
     rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
     writer.StartObject();
@@ -85,7 +85,7 @@ std::optional<std::string> login(const char *apikey, const char *userkey, const 
     return doc["token"].GetString();
 }
 
-bool refresh_token(const char *token) {
+bool refresh_token(const char* token) {
     auto r = cpr::Get(
         cpr::Url(BASE_URL "refresh_token"),
         create_token_header(token)
@@ -94,7 +94,7 @@ bool refresh_token(const char *token) {
     return (r.status_code == HTTP_CODE_OK);
 }
 
-std::optional<rapidjson::Document> search_series(const char *name, const char *token) {
+std::optional<rapidjson::Document> search_series(const char* name, const char* token) {
     auto r = cpr::Get(
         cpr::Url(BASE_URL "search/series"),
         create_token_header(token),
@@ -119,7 +119,7 @@ std::optional<rapidjson::Document> search_series(const char *name, const char *t
     return doc;
 }
 
-std::optional<rapidjson::Document> get_series(sid_t id, const char *token) {
+std::optional<rapidjson::Document> get_series(sid_t id, const char* token) {
     auto r = cpr::Get(
         cpr::Url(BASE_URL "series/" + std::to_string(id)),
         create_token_header(token)
@@ -143,7 +143,7 @@ std::optional<rapidjson::Document> get_series(sid_t id, const char *token) {
     return doc;
 }
 
-std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char *token) {
+std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char* token) {
     auto get_page = [id, token](int page) {
         auto r = cpr::Get(
             cpr::Url(BASE_URL "series/" + std::to_string(id) + "/episodes"),

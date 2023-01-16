@@ -27,6 +27,7 @@ set(APP_DIR ${SRC_DIR})
 add_library(app_lib STATIC
     ${SRC_DIR}/app/app.cpp
     ${SRC_DIR}/app/app_config.cpp
+    ${SRC_DIR}/app/app_credentials.cpp
     ${SRC_DIR}/app/app_schemas.cpp
     ${SRC_DIR}/app/app_folder.cpp
     ${SRC_DIR}/app/app_folder_state.cpp
@@ -58,6 +59,8 @@ target_compile_features(main PRIVATE cxx_std_17)
 target_link_libraries(main app_lib imgui)
 
 if (WIN32)
+target_compile_options(tvdb_api PRIVATE "/MP")
+target_compile_options(app_lib PRIVATE "/MP")
 target_compile_options(cli_test PRIVATE "/MP")
 target_compile_options(main PRIVATE "/MP")
 endif (WIN32)

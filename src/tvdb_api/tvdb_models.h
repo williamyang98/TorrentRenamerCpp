@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include <string>
+#include <optional>
 
 namespace tvdb_api {
 
@@ -11,23 +12,16 @@ struct SeriesInfo {
     std::string name;
     std::string air_date;
     std::string status;
+    std::optional<std::string> overview;
 };
 
 // stores info about an episode 
 struct EpisodeInfo {
-    uint32_t id;
-    int season;
-    int episode;
+    uint32_t id = 0;
+    int season = 0;
+    int episode = 0;
     std::string air_date;
     std::string name;
-
-    EpisodeInfo() {
-        id = 0;
-        season = 0;
-        episode = 0;
-        air_date = "";
-        name = "";
-    }
 };
 
 // key for unordered map for episode lookup

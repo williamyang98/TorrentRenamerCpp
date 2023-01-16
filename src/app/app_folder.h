@@ -64,10 +64,10 @@ public:
 
     // NOTE: If the return value is a boolean
     //       Then the boolean indicates complete success
-    bool load_cache_from_tvdb(uint32_t id, const char *token);
+    bool load_cache_from_tvdb(uint32_t id, const char* token);
     bool load_cache_from_file();
     void update_state_from_cache();
-    bool load_search_series_from_tvdb(const char *name, const char *token);
+    bool load_search_series_from_tvdb(const char* name, const char* token);
     bool execute_actions();
     const auto&  GetPath() const { return m_path; }
     void open_folder(const std::string& path);

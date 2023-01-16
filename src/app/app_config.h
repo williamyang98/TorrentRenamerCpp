@@ -13,6 +13,7 @@ struct AppConfig {
     std::vector<std::string> whitelist_tags; 
 };
 
-AppConfig load_app_config_from_filepath(const char *filename);
+// THROWS: Runtime error with descriptor message
+AppConfig load_app_config_from_filepath(const char* filename);
 
 }

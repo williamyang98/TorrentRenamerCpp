@@ -51,7 +51,7 @@ std::string wide_string_to_string(const std::wstring& wide_string)
 }
 
 std::optional<std::string> open_folder_dialog(void) {
-    IFileOpenDialog *m_dialog;
+    IFileOpenDialog* m_dialog;
 
     HRESULT hr = 
         CoCreateInstance(
@@ -69,7 +69,7 @@ std::optional<std::string> open_folder_dialog(void) {
     hr = m_dialog->Show(NULL);
     if (!SUCCEEDED(hr)) return {};
 
-    IShellItem *pItem;
+    IShellItem* pItem;
     hr = m_dialog->GetResult(&pItem);
     if (!SUCCEEDED(hr)) return {};
 
@@ -87,11 +87,11 @@ std::optional<std::string> open_folder_dialog(void) {
     static constexpr int MAX_BUFFER_SIZE = 1024;
     static char buffer[MAX_BUFFER_SIZE];
 
-    FILE *f = popen(
+    FILE* f = popen(
             "zenity --file-selection --directory "
             "--title=\"Select a folder\"", "r");
 
-    char *res = fgets(buffer, MAX_BUFFER_SIZE-1, f);
+    char* res = fgets(buffer, MAX_BUFFER_SIZE-1, f);
     fclose(f);
     if (res == NULL) {
         return {};

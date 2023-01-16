@@ -16,6 +16,13 @@ SeriesInfo load_series_info(const rapidjson::Document& doc) {
     series.name = doc["seriesName"].GetString();
     series.air_date = get_string_default(doc["firstAired"]);
     series.status = get_string_default(doc["status"]);
+
+    if (doc["overview"].IsString()) {
+        series.overview = doc["overview"].GetString();
+    } else {
+        series.overview = std::nullopt;
+    }
+
     return series;
 }
 
@@ -34,7 +41,6 @@ EpisodesMap load_series_episodes_info(const rapidjson::Document& doc) {
         ep.episode = e["airedEpisodeNumber"].GetInt();
         ep.air_date = get_string_default(e["firstAired"]);
         ep.name = get_string_default(e["episodeName"]);
-
         
         EpisodeKey key {ep.season, ep.episode};
         episodes[key] = ep;
