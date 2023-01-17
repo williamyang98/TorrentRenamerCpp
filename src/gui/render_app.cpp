@@ -235,7 +235,7 @@ void RenderSeriesList(App& main_app) {
             }
             ImGui::SameLine();
             // folder name
-            ImGui::Text(folder_name.c_str());
+            ImGui::Text("%s", folder_name.c_str());
             if (selected_pressed) {
                 main_app.m_current_folder = folder;
                 main_app.queue_async_call([&folder](int pid) {
@@ -518,7 +518,7 @@ void RenderFilesRename(AppFolder& folder) {
             }
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::TextWrapped(src_name);
+            ImGui::TextWrapped("%s", src_name);
             ImGui::TableSetColumnIndex(2);
 
             ImGui::PushItemWidth(-1.0f);
@@ -606,7 +606,7 @@ void RenderFilesDelete(AppFolder& folder) {
             }
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::TextWrapped(intent.GetSrc().c_str());
+            ImGui::TextWrapped("%s", intent.GetSrc().c_str());
             ImGui::SameLine();
 
             const char* popup_id = "##intent action popup";
@@ -799,7 +799,7 @@ void RenderErrors(App& main_app) {
 
             bool is_pressed = ImGui::Button("X");
             ImGui::SameLine();
-            ImGui::TextWrapped(error.c_str());
+            ImGui::TextWrapped("%s", error.c_str());
 
             if (is_pressed) {
                 it = errors.erase(it);
@@ -860,13 +860,13 @@ void RenderSeriesSelectModal(App& main_app, AppFolder& folder) {
                 ImGui::TableNextRow();
                 ImGui::PushID(sid++);
                 ImGui::TableSetColumnIndex(0);
-                ImGui::Text(r.name.c_str());
+                ImGui::Text("%s", r.name.c_str());
                 ImGui::TableSetColumnIndex(1);
-                ImGui::Text(r.air_date.c_str());
+                ImGui::Text("%s", r.air_date.c_str());
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%d", r.id);
                 ImGui::TableSetColumnIndex(3);
-                ImGui::Text(r.status.c_str());
+                ImGui::Text("%s", r.status.c_str());
                 ImGui::TableSetColumnIndex(4);
                 if (ImGui::Button("Select")) {
                     uint32_t id = r.id;
@@ -906,7 +906,7 @@ void RenderAppWarnings(App& main_app) {
 
             bool is_pressed = ImGui::Button("X");
             ImGui::SameLine();
-            ImGui::TextWrapped(warning.c_str());
+            ImGui::TextWrapped("%s", warning.c_str());
 
             if (is_pressed) {
                 it = warnings.erase(it);
@@ -943,7 +943,7 @@ void RenderAppErrors(App& main_app) {
         ImGui::Separator();
         if (ImGui::BeginListBox("##app error list", ImVec2(-1,-1))) {
             for (const auto& e: errors) {
-                ImGui::TextWrapped(e.c_str());
+                ImGui::TextWrapped("%s", e.c_str());
             }
 
             ImGui::EndListBox();
