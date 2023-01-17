@@ -59,6 +59,16 @@ tl::expected<std::string, std::string> login(const char* apikey, const char* use
         return tl::make_unexpected<std::string>(std::move(err));
     }
 
+    if (!doc.HasMember("token")) {
+        auto err = fmt::format("Missing field 'token' in url={}", r.url.c_str());
+        return tl::make_unexpected<std::string>(std::move(err));
+    }
+
+    if (!doc["token"].IsString()) {
+        auto err = fmt::format("Field 'token' is not a string in url={}", r.url.c_str());
+        return tl::make_unexpected<std::string>(std::move(err));
+    }
+
     return doc["token"].GetString();
 }
 
@@ -90,6 +100,11 @@ tl::expected<rapidjson::Document, std::string> search_series(const char* name, c
         return tl::make_unexpected<std::string>(std::move(err));
     }
 
+    if (!doc.HasMember("data")) {
+        auto err = fmt::format("Missing field 'data' in url={}", r.url.c_str());
+        return tl::make_unexpected<std::string>(std::move(err));
+    }
+
     doc.Swap(doc["data"]);
     return doc;
 }
@@ -112,6 +127,11 @@ tl::expected<rapidjson::Document, std::string> get_series(sid_t id, const char* 
         return tl::make_unexpected<std::string>(std::move(err));
     }
 
+    if (!doc.HasMember("data")) {
+        auto err = fmt::format("Missing field 'data' in url={}", r.url.c_str());
+        return tl::make_unexpected<std::string>(std::move(err));
+    }
+
     doc.Swap(doc["data"]);
     return doc;
 }
@@ -121,7 +141,7 @@ tl::expected<rapidjson::Document, std::string> get_series_episodes(sid_t id, con
     rapidjson::Document combined_doc;
     combined_doc.SetArray();
 
-    auto add_page = [id, token, &combined_doc](int page) -> tl::expected<rapidjson::Document, std::string> {
+    auto add_page = [id, token, &combined_doc](const int page) -> tl::expected<rapidjson::Document, std::string> {
         // Attempt to get page from url
         auto r = cpr::Get(
             cpr::Url(BASE_URL "series/" + std::to_string(id) + "/episodes"),
@@ -130,7 +150,7 @@ tl::expected<rapidjson::Document, std::string> get_series_episodes(sid_t id, con
         );
 
         if (r.status_code != HTTP_CODE_OK) {
-            auto err = fmt::format("Got invalid http_code for url={}, http_code={}", r.url.c_str(), r.status_code);
+            auto err = fmt::format("Got invalid http_code for url={}, page={}, http_code={}", r.url.c_str(), page, r.status_code);
             return tl::make_unexpected<std::string>(std::move(err));
         }
 
@@ -138,7 +158,12 @@ tl::expected<rapidjson::Document, std::string> get_series_episodes(sid_t id, con
         rapidjson::Document doc;
         rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
         if (ok.IsError()) {
-            auto err = fmt::format("Got invalid JSON for url={}, code={}, offset={}", r.url.c_str(), ok.Code(), ok.Offset());
+            auto err = fmt::format("Got invalid JSON for url={}, page={}, code={}, offset={}", r.url.c_str(), page, ok.Code(), ok.Offset());
+            return tl::make_unexpected<std::string>(std::move(err));
+        }
+
+        if (!doc.HasMember("data")) {
+            auto err = fmt::format("Missing field 'data' in url={}, page={}", r.url.c_str(), page);
             return tl::make_unexpected<std::string>(std::move(err));
         }
 
@@ -158,11 +183,18 @@ tl::expected<rapidjson::Document, std::string> get_series_episodes(sid_t id, con
     if (!page_1_doc_opt) {
         return tl::make_unexpected<std::string>(std::move(page_1_doc_opt.error()));
     }
-
     auto& page_1_doc = page_1_doc_opt.value();
+
+    // NOTE: If we do not have links to the next and last page
+    //       then we assume that this is the only page of episodes data
+    if (!page_1_doc.HasMember("links")) {
+        return combined_doc;
+    }
     auto& links = page_1_doc["links"];
-    // NOTE: This occurs if there is only one page in the response
-    if (!links["next"].IsInt() || !links["last"].IsInt()) {
+    if (!links.HasMember("next") || !links["next"].IsInt()) {
+        return combined_doc;
+    }
+    if (!links.HasMember("last") || !links["last"].IsInt()) {
         return combined_doc;
     }
     const int next_page = links["next"].GetInt();
