@@ -6,7 +6,8 @@ namespace app
 {
 
 AppFileState::AppFileState(AppFolderState& folder, FileIntent&& intent)
-: m_folder(folder), m_intent(intent) {
+: m_folder(folder), m_intent(std::move(intent))   
+{
     m_old_dest = m_intent.dest;
 }
 
