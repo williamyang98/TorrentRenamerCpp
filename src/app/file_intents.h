@@ -41,11 +41,7 @@ std::vector<FileIntent> get_directory_file_intents(
     const FilterRules& rules, 
     const tvdb_api::TVDB_Cache& api_cache);
 
-enum FileIntentExecuteResult {
-    NO_CHANGE, SUCCESS, ERROR
-};
-
-// Returns false if nothing happened
-FileIntentExecuteResult execute_file_intent(const std::filesystem::path& root, const FileIntent& intent);
+// THROWS: If there is an IO exception it will propagate upwards
+void execute_file_intent(const std::filesystem::path& root, const FileIntent& intent);
 
 };

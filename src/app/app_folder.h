@@ -68,7 +68,7 @@ public:
     bool load_cache_from_file();
     void update_state_from_cache();
     bool load_search_series_from_tvdb(const char* name, const char* token);
-    bool execute_actions();
+    void execute_actions();
     const auto&  GetPath() const { return m_path; }
     void open_folder(const std::string& path);
     void open_file(const std::string& path);

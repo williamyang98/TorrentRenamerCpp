@@ -16,7 +16,8 @@
 #include "gui/imgui_config.h"
 #include "gui/render_app.h"
 
-// if we are on windows, we need to startup some win32 event loop stuff
+// NOTE: This is required since we might want to open a file dialog using the win32 api
+//       and those api calls require an event loop to be established
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -79,28 +80,22 @@ int main(int argc, const char** argv)
     spdlog::set_level(spdlog::level::debug);
     #endif
     
-    #ifdef _WIN32
+    #if defined(_WIN32)
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     #endif
     
-    int rv = 1;
-    try {
-        const char* root_path = (argc > 1) ? argv[1] : NULL;
-        app::App main_app("res/app_config.json");
-        if (root_path == NULL) {
-            main_app.queue_app_warning("Please specify a filepath as an argument when starting the application");
-        } else {
-            main_app.m_root = fs::path(root_path);
-            main_app.refresh_folders();
-        }
-        auto renderer = Renderer(main_app);
-        rv = RenderImguiSkeleton(&renderer);
-    } catch (std::exception &ex) {
-        spdlog::critical(fmt::format("Exception in main: {}", ex.what()));
-        rv = 1;
+    const char* root_path = (argc > 1) ? argv[1] : NULL;
+    app::App main_app("res/app_config.json");
+    if (root_path == NULL) {
+        main_app.queue_app_warning("Please specify a filepath as an argument when starting the application");
+    } else {
+        main_app.m_root = fs::path(root_path);
+        main_app.refresh_folders();
     }
+    auto renderer = Renderer(main_app);
+    const int rv = RenderImguiSkeleton(&renderer);
 
-    #ifdef _WIN32
+    #if defined(_WIN32)
     CoUninitialize();
     #endif
 

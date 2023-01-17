@@ -18,7 +18,7 @@ add_library(tvdb_api STATIC
     ${TVDB_API_DIR}/tvdb_json.cpp
 )
 target_compile_features(tvdb_api PRIVATE cxx_std_17)
-target_include_directories(tvdb_api PUBLIC ${TVDB_API_DIR})
+target_include_directories(tvdb_api PUBLIC ${TVDB_API_DIR} ${SRC_DIR})
 target_link_libraries(tvdb_api 
     PUBLIC rapidjson fmt::fmt spdlog::spdlog 
     PRIVATE cpr::cpr)
@@ -38,7 +38,7 @@ add_library(app_lib STATIC
     ${SRC_DIR}/os_dep.cpp
 )
 target_compile_features(app_lib PRIVATE cxx_std_17)
-target_include_directories(app_lib PUBLIC ${APP_DIR})
+target_include_directories(app_lib PUBLIC ${APP_DIR} ${SRC_DIR})
 target_link_libraries(app_lib PUBLIC 
     tvdb_api rapidjson fmt::fmt spdlog::spdlog)
 

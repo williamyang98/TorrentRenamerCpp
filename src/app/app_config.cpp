@@ -10,32 +10,34 @@
 namespace app 
 {
 
-AppConfig load_app_config_from_filepath(const char* filename) {
+static
+std::vector<std::string> load_string_list(rapidjson::Document& doc, const char* key) {
+    auto vec = std::vector<std::string>();
+    if (!doc.HasMember(key)) {
+        return vec;
+    }
+
+    const auto& arr = doc[key].GetArray();
+    for (auto& entry: arr) {
+        if (entry.IsString()) {
+            vec.push_back(entry.GetString());
+        }
+    }
+    return vec;
+};
+
+tl::expected<AppConfig, std::string> load_app_config_from_filepath(const char* filename) {
     auto load_result = util::load_document_from_file(filename);
     if (load_result.code != util::DocumentLoadCode::OK) {
         auto err = fmt::format("Failed to load app config json from: {}", filename);
-        spdlog::critical(err);
-        throw std::runtime_error(err);
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     auto& doc = load_result.doc;
     if (!util::validate_document(doc, APP_SCHEMA_DOC)) {
         auto err = fmt::format("App config file ({}) has invalid format", filename); 
-        spdlog::critical(err);
-        throw std::runtime_error(err);
+        return tl::make_unexpected<std::string>(std::move(err));
     }
-
-    auto load_string_list = [](rapidjson::Document& doc, const char* key) {
-        std::vector<std::string> vec;
-        if (!doc.HasMember(key)) {
-            return vec;
-        }
-        const auto& v = doc[key].GetArray();
-        for (auto& e: v) {
-            vec.push_back(e.GetString());
-        }
-        return vec;
-    };
 
     AppConfig cfg;
     cfg.credentials_filepath = doc["credentials_file"].GetString();

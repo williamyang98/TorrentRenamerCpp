@@ -14,42 +14,22 @@
 #include <spdlog/spdlog.h>
 
 #include "tvdb_api.h"
-#include "tvdb_api_schema.h"
-
-constexpr int HTTP_CODE_OK = 200;
+#include "util/file_loading.h"
+#include "util/expected.hpp"
 
 // NOTE: HTTPS requires extra work which I don't know how to do
 // #define BASE_URL "https://api.thetvdb.com/"
 #define BASE_URL "http://api.thetvdb.com/"
-
-namespace tvdb_api 
-{
-
-void validate_response(const rapidjson::Document& doc, rapidjson::SchemaDocument& schema_doc) {
-    rapidjson::SchemaValidator validator(schema_doc);
-    if (doc.Accept(validator)) {
-        return;
-    }
-    spdlog::error("Api response doesn't match schema");
-
-    rapidjson::StringBuffer sb;
-    validator.GetInvalidDocumentPointer().StringifyUriFragment(sb);
-    spdlog::error(fmt::format("document pointer: {}", sb.GetString()));
-    spdlog::error(fmt::format("error-type: {}", validator.GetInvalidSchemaKeyword()));
-    sb.Clear();
-
-    validator.GetInvalidSchemaPointer().StringifyUriFragment(sb);
-    spdlog::error(fmt::format("schema pointer: {}", sb.GetString()));
-    sb.Clear();
-
-    throw std::runtime_error("tvdb api response failed to match schema");
-}
+constexpr int HTTP_CODE_OK = 200;
 
 cpr::Header create_token_header(const char* token) {
     return cpr::Header{{"Authorization", "Bearer " + std::string(token)}};
 }
 
-std::optional<std::string> login(const char* apikey, const char* userkey, const char* username) {
+namespace tvdb_api 
+{
+
+tl::expected<std::string, std::string> login(const char* apikey, const char* userkey, const char* username) {
     rapidjson::StringBuffer sb;
     rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
     writer.StartObject();
@@ -67,19 +47,16 @@ std::optional<std::string> login(const char* apikey, const char* userkey, const 
         cpr::Body(sb.GetString())
     );
 
-    spdlog::debug(fmt::format("Got response code {} on login", r.status_code));
-
     if (r.status_code != HTTP_CODE_OK) {
-        return {};
+        auto err = fmt::format("Got invalid http_code for url={}, http_code={}", r.url.c_str(), r.status_code);
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
     if (ok.IsError()) {
-        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
-        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
-            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
-        return {};
+        auto err = fmt::format("Got invalid JSON for url={}, code={}, offset={}", r.url.c_str(), ok.Code(), ok.Offset());
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     return doc["token"].GetString();
@@ -94,7 +71,7 @@ bool refresh_token(const char* token) {
     return (r.status_code == HTTP_CODE_OK);
 }
 
-std::optional<rapidjson::Document> search_series(const char* name, const char* token) {
+tl::expected<rapidjson::Document, std::string> search_series(const char* name, const char* token) {
     auto r = cpr::Get(
         cpr::Url(BASE_URL "search/series"),
         create_token_header(token),
@@ -102,112 +79,103 @@ std::optional<rapidjson::Document> search_series(const char* name, const char* t
     );
 
     if (r.status_code != HTTP_CODE_OK) {
-        return {};
+        auto err = fmt::format("Got invalid http_code for url={}, http_code={}", r.url.c_str(), r.status_code);
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
     if (ok.IsError()) {
-        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
-        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
-            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
-        return {};
+        auto err = fmt::format("Got invalid JSON for url={}, code={}, offset={}", r.url.c_str(), ok.Code(), ok.Offset());
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     doc.Swap(doc["data"]);
-    validate_response(doc, SEARCH_DATA_SCHEMA);
     return doc;
 }
 
-std::optional<rapidjson::Document> get_series(sid_t id, const char* token) {
+tl::expected<rapidjson::Document, std::string> get_series(sid_t id, const char* token) {
     auto r = cpr::Get(
         cpr::Url(BASE_URL "series/" + std::to_string(id)),
         create_token_header(token)
     );
 
     if (r.status_code != HTTP_CODE_OK) {
-        return {};
+        auto err = fmt::format("Got invalid http_code for url={}, http_code={}", r.url.c_str(), r.status_code);
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     rapidjson::Document doc;
     rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
     if (ok.IsError()) {
-        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
-        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
-            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
-        return {};
+        auto err = fmt::format("Got invalid JSON for url={}, code={}, offset={}", r.url.c_str(), ok.Code(), ok.Offset());
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     doc.Swap(doc["data"]);
-    validate_response(doc, SERIES_DATA_SCHEMA);
     return doc;
 }
 
-std::optional<rapidjson::Document> get_series_episodes(sid_t id, const char* token) {
-    auto get_page = [id, token](int page) {
+tl::expected<rapidjson::Document, std::string> get_series_episodes(sid_t id, const char* token) {
+    // Append additional pages into our super document
+    rapidjson::Document combined_doc;
+    combined_doc.SetArray();
+
+    auto add_page = [id, token, &combined_doc](int page) -> tl::expected<rapidjson::Document, std::string> {
+        // Attempt to get page from url
         auto r = cpr::Get(
             cpr::Url(BASE_URL "series/" + std::to_string(id) + "/episodes"),
             create_token_header(token),
             cpr::Parameters{{"page", std::to_string(page)}}
         );
-        return r;
-    };
 
-    auto r = get_page(1);
-    if (r.status_code != HTTP_CODE_OK) {
-        return {};
-    }
+        if (r.status_code != HTTP_CODE_OK) {
+            auto err = fmt::format("Got invalid http_code for url={}, http_code={}", r.url.c_str(), r.status_code);
+            return tl::make_unexpected<std::string>(std::move(err));
+        }
 
-    rapidjson::Document combined_doc;
-    combined_doc.SetArray();
+        // Check if the response was valid json
+        rapidjson::Document doc;
+        rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
+        if (ok.IsError()) {
+            auto err = fmt::format("Got invalid JSON for url={}, code={}, offset={}", r.url.c_str(), ok.Code(), ok.Offset());
+            return tl::make_unexpected<std::string>(std::move(err));
+        }
 
-    auto add_episodes = [&combined_doc](rapidjson::Document& doc) {
+        // Append the json data to the combined document
         auto episodes_data = doc["data"].GetArray();
         for (auto& ep_data: episodes_data) {
             rapidjson::Value ep_copy;
             ep_copy.CopyFrom(ep_data, combined_doc.GetAllocator()) ;
             combined_doc.PushBack(ep_copy, combined_doc.GetAllocator());
         }
+
+        return doc;
     };
 
-    rapidjson::Document doc;
-    rapidjson::ParseResult ok = doc.Parse(r.text.c_str());
-    if (ok.IsError()) {
-        spdlog::warn(fmt::format("Got invalid json response for {}", r.url.c_str()));
-        spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
-            rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
-        return {};
+    // Need first page to get number of pages
+    auto page_1_doc_opt = add_page(1);
+    if (!page_1_doc_opt) {
+        return tl::make_unexpected<std::string>(std::move(page_1_doc_opt.error()));
     }
-    add_episodes(doc);
-    
-    auto& links = doc["links"];
-    if (!(links["next"].IsInt() && links["last"].IsInt())) {
+
+    auto& page_1_doc = page_1_doc_opt.value();
+    auto& links = page_1_doc["links"];
+    // NOTE: This occurs if there is only one page in the response
+    if (!links["next"].IsInt() || !links["last"].IsInt()) {
         return combined_doc;
     }
+    const int next_page = links["next"].GetInt();
+    const int last_page = links["last"].GetInt();
 
-    int next_page = links["next"].GetInt();
-    int last_page = links["last"].GetInt();
-
+    // Iterate through the pagination list
     for (int i = next_page; i <= last_page; i++) {
-        auto r0 = get_page(i);
-        if (r0.status_code != HTTP_CODE_OK) {
-            spdlog::critical("Request failed in middle of page loading for episodes data");
-            throw std::runtime_error("Request failed in middle of page loading for episodes data");
+        auto page_doc_opt = add_page(i);
+        if (!page_doc_opt) {
+            return tl::make_unexpected<std::string>(std::move(page_doc_opt.error()));
         }
-
-        rapidjson::Document doc0;
-        // if this page was in an invalid json format, we just ignore it
-        ok = doc0.Parse(r0.text.c_str());
-        if (ok.IsError()) {
-            spdlog::warn(fmt::format("Got invalid json response for {}", r0.url.c_str()));
-            spdlog::warn(fmt::format("JSON parse error: {} ({})\n", 
-                rapidjson::GetParseError_En(ok.Code()), ok.Offset()));
-            continue;
-        }
-        add_episodes(doc0);
     }
-    
-    validate_response(combined_doc, EPISODES_DATA_SCHEMA);
+
     return combined_doc;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <optional>
+#include "util/expected.hpp"
 
 namespace app
 {
@@ -12,7 +13,6 @@ struct AppCredentials {
     std::optional<std::string> token;
 };
 
-// THROWS: Runtime error with descriptor message
-AppCredentials load_credentials_from_filepath(const char* filename);
+tl::expected<AppCredentials, std::string> load_credentials_from_filepath(const char* filename);
 
 };

@@ -3,13 +3,22 @@
 #include <vector>
 #include <rapidjson/document.h>
 
-namespace tvdb_api {
+#include "tvdb_api_schema.h"
+#include "util/file_loading.h"
 
-// for all loading checks, refer to the schema file (tvdb_api_schema.cpp) for structure of document
-SeriesInfo load_series_info(const rapidjson::Document& doc) {
-    auto get_string_default = [](const rapidjson::Value& v) {
-        return v.IsString() ? v.GetString() : "";
-    };
+static 
+const char* get_string_default(const rapidjson::Value& v) {
+    return v.IsString() ? v.GetString() : "";
+};
+
+namespace tvdb_api 
+{
+
+// NOTE: Refer to tvdb_api_schema.cpp for schemas
+tl::expected<SeriesInfo, const char*> load_series_info(const rapidjson::Document& doc) {
+    if (!util::validate_document(doc, tvdb_api::SERIES_DATA_SCHEMA)) {
+        return tl::make_unexpected<const char*>("Failed to validate series data");
+    }
 
     SeriesInfo series;
     series.id = doc["id"].GetUint();
@@ -17,22 +26,25 @@ SeriesInfo load_series_info(const rapidjson::Document& doc) {
     series.air_date = get_string_default(doc["firstAired"]);
     series.status = get_string_default(doc["status"]);
 
-    if (doc["overview"].IsString()) {
-        series.overview = doc["overview"].GetString();
-    } else {
-        series.overview = std::nullopt;
+    if (doc.HasMember("overview")) {
+        if (doc["overview"].IsString()) {
+            series.overview = doc["overview"].GetString();
+        } else {
+            series.overview = std::nullopt;
+        }
     }
 
     return series;
 }
 
-EpisodesMap load_series_episodes_info(const rapidjson::Document& doc) {
+// NOTE: Refer to tvdb_api_schema.cpp for schemas
+tl::expected<EpisodesMap, const char*> load_series_episodes_info(const rapidjson::Document& doc) {
+    if (!util::validate_document(doc, tvdb_api::EPISODES_DATA_SCHEMA)) {
+        return tl::make_unexpected<const char*>("Failed to validate episodes data");
+    }
+
     auto episodes = EpisodesMap();
     auto data = doc.GetArray();
-
-    auto get_string_default = [](const rapidjson::Value& v) {
-        return v.IsString() ? v.GetString() : "";
-    };
 
     for (auto& e: data) {
         EpisodeInfo ep;
@@ -49,20 +61,22 @@ EpisodesMap load_series_episodes_info(const rapidjson::Document& doc) {
     return episodes;
 }
 
+// NOTE: Refer to tvdb_api_schema.cpp for schemas
+tl::expected<std::vector<SeriesInfo>, const char*> load_search_info(const rapidjson::Document& doc) {
+    if (!util::validate_document(doc, tvdb_api::SEARCH_DATA_SCHEMA)) {
+        return tl::make_unexpected<const char*>("Failed to validate series search data");
+    }
 
-std::vector<SeriesInfo> load_search_info(const rapidjson::Document& doc) {
-    std::vector<SeriesInfo> series;
-
+    auto series = std::vector<SeriesInfo>();
     auto data = doc.GetArray();
     series.reserve(data.Size());
 
     for (auto& s: data) {
-        SeriesInfo o;
+        auto& o = series.emplace_back();
         o.name = s["seriesName"].GetString();
         o.air_date = s["firstAired"].GetString();
         o.status = s["status"].GetString();
         o.id = s["id"].GetUint();
-        series.push_back(o);
     }
     
     return series;

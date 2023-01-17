@@ -7,11 +7,9 @@
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
 
-#include "app_schemas.h"
 #include "app_folder_state.h"
 #include "file_intents.h"
 #include "tvdb_api/tvdb_api.h"
-#include "tvdb_api/tvdb_api_schema.h"
 #include "tvdb_api/tvdb_models.h"
 #include "tvdb_api/tvdb_json.h"
 #include "util/file_loading.h"
@@ -68,24 +66,22 @@ bool AppFolder::load_search_series_from_tvdb(const char* name, const char* token
 
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
-    try {
-        auto search_opt = tvdb_api::search_series(name, token);
-        if (!search_opt) {
-            push_error(std::string("Failed to get search results from tvdb"));
-            return false;
-        }
-
-        auto& search_doc = search_opt.value();
-        auto result = tvdb_api::load_search_info(search_doc);
-        {
-            std::scoped_lock lock(m_search_mutex);
-            m_search_result = std::move(result);
-        }
-    } catch (std::exception& ex) {
-        push_error(std::string(ex.what()));
+    auto search_opt = tvdb_api::search_series(name, token);
+    if (!search_opt) {
+        push_error(search_opt.error());
         return false;
     }
-    return false;
+
+    auto& search_doc = search_opt.value();
+    auto result = tvdb_api::load_search_info(search_doc);
+    if (!result) {
+        push_error(result.error());
+        return false;
+    }
+
+    std::scoped_lock lock(m_search_mutex);
+    m_search_result = std::move(result.value());
+    return true;
 }
 
 // thread safe load series and episodes data from tvdb with validation, and store as cache
@@ -93,47 +89,56 @@ bool AppFolder::load_cache_from_tvdb(uint32_t id, const char* token) {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
-    try {
-        auto series_opt = tvdb_api::get_series(id, token);
-        if (!series_opt) {
-            push_error(std::string("Failed to fetch series info from tvdb"));
+    // attempt to fetch data from tvdb api
+    auto series_opt = tvdb_api::get_series(id, token);
+    if (!series_opt) {
+        push_error(series_opt.error());
+        return false;
+    }
+
+    auto episodes_opt = tvdb_api::get_series_episodes(id, token);
+    if (!episodes_opt) {
+        push_error(episodes_opt.error());
+        return false;
+    }
+
+    auto& series_doc = series_opt.value();
+    auto& episodes_doc = episodes_opt.value();
+
+    // update cache
+    {
+        auto series_cache_opt = tvdb_api::load_series_info(series_doc);
+        if (!series_cache_opt) {
+            push_error(series_cache_opt.error());
             return false;
         }
 
-        auto episodes_opt = tvdb_api::get_series_episodes(id, token);
-        if (!episodes_opt) {
-            push_error(std::string("Failed to fetch episodes info from tvdb"));
+        auto episodes_cache_opt = tvdb_api::load_series_episodes_info(episodes_doc);
+        if (!episodes_cache_opt) {
+            push_error(episodes_cache_opt.error());
             return false;
         }
 
-        auto& series_doc = series_opt.value();
-        auto& episodes_doc = episodes_opt.value();
-        // update cache
-        {
-            auto series_cache = tvdb_api::load_series_info(series_doc);
-            auto episodes_cache = tvdb_api::load_series_episodes_info(episodes_doc);
+        auto& series_cache = series_cache_opt.value();
+        auto& episodes_cache = episodes_cache_opt.value();
+        std::scoped_lock lock(m_cache_mutex);
+        auto cache = tvdb_api::TVDB_Cache{std::move(series_cache), std::move(episodes_cache)};
+        m_cache = std::move(cache);
+        m_is_info_cached = true;
+    }
 
-            std::scoped_lock lock(m_cache_mutex);
-            auto cache = tvdb_api::TVDB_Cache{ std::move(series_cache), std::move(episodes_cache) };
-            m_cache = std::move(cache);
-            m_is_info_cached = true;
-        }
+    // write cache to series folder
+    const auto series_cache_path = fs::absolute(m_path / SERIES_CACHE_FN);
+    const auto episodes_cache_path = fs::absolute(m_path / EPISODES_CACHE_FN);
+    if (!util::write_document_to_file(series_cache_path.string().c_str(), series_doc)) {
+        auto lock = std::scoped_lock(m_errors_mutex);
+        push_error("Failed to write series cache file");
+        return false;
+    }
 
-        auto series_cache_path = fs::absolute(m_path / SERIES_CACHE_FN);
-        if (!util::write_document_to_file(series_cache_path.string().c_str(), series_doc)) {
-            auto lock = std::scoped_lock(m_errors_mutex);
-            push_error(std::string("Failed to write series cache file"));
-            return false;
-        }
-
-        auto episodes_cache_path = fs::absolute(m_path / EPISODES_CACHE_FN);
-        if (!util::write_document_to_file(episodes_cache_path.string().c_str(), episodes_doc)) {
-            auto lock = std::scoped_lock(m_errors_mutex);
-            push_error(std::string("Failed to write series cache file"));
-            return false;
-        }
-    } catch (std::exception& ex) {
-        push_error(std::string(ex.what()));
+    if (!util::write_document_to_file(episodes_cache_path.string().c_str(), episodes_doc)) {
+        auto lock = std::scoped_lock(m_errors_mutex);
+        push_error("Failed to write episodes cache file");
         return false;
     }
 
@@ -145,37 +150,41 @@ bool AppFolder::load_cache_from_file() {
     if (m_is_busy) return false;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
+    // load cache from series folder
+    // NOTE: We expect that this may not load since the cache hasn't been downloaded from api
     const fs::path series_cache_fn = m_path / SERIES_CACHE_FN;
+    const fs::path episodes_cache_fn = m_path / EPISODES_CACHE_FN;
     auto series_res = util::load_document_from_file(series_cache_fn.string().c_str());
     if (series_res.code != util::DocumentLoadCode::OK) {
         return false;
     }
 
-    const fs::path episodes_cache_fn = m_path / EPISODES_CACHE_FN;
     auto episodes_res = util::load_document_from_file(episodes_cache_fn.string().c_str());
     if (episodes_res.code != util::DocumentLoadCode::OK) {
         return false;
     }
 
+    // attempt to read in json data
     auto& series_doc = series_res.doc;
     auto& episodes_doc = episodes_res.doc;
-
-    if (!util::validate_document(series_doc, tvdb_api::SERIES_DATA_SCHEMA)) {
-        push_error(std::string("Failed to validate series data"));
+    
+    auto series_cache_opt = tvdb_api::load_series_info(series_doc);
+    if (!series_cache_opt) {
+        push_error("Failed to validate series data");
         return false;
     }
 
-    if (!util::validate_document(episodes_doc, tvdb_api::EPISODES_DATA_SCHEMA)) {
-        push_error(std::string("Failed to validate episodes data"));
+    auto episodes_cache_opt = tvdb_api::load_series_episodes_info(episodes_doc);
+    if (!episodes_cache_opt) {
+        push_error("Failed to validate episodes data");
         return false;
     }
 
+    auto& series_cache = series_cache_opt.value();
+    auto& episodes_cache = episodes_cache_opt.value();
     {
-        auto series_cache = tvdb_api::load_series_info(series_doc);
-        auto episodes_cache = tvdb_api::load_series_episodes_info(episodes_doc);
-
         auto lock = std::scoped_lock(m_cache_mutex);
-        auto cache = tvdb_api::TVDB_Cache{ std::move(series_cache), std::move(episodes_cache) };
+        auto cache = tvdb_api::TVDB_Cache{std::move(series_cache), std::move(episodes_cache)};
         m_cache = std::move(cache);
         m_is_info_cached = true;
     }
@@ -217,21 +226,22 @@ void AppFolder::update_state_from_cache() {
 }
 
 // thread safe execute all actions in folder diff
-bool AppFolder::execute_actions() {
-    if (m_is_busy) return false;
+void AppFolder::execute_actions() {
+    if (m_is_busy) return;
     auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
 
     auto lock = std::scoped_lock(m_state_mutex);
     auto& intents = m_state->GetIntents();
 
-    bool is_conflict = false;
-
     // Remove deletes first to remove filepath conflicts where possible
     for (auto& [_, file_state]: intents) {
         auto& intent = file_state.GetIntent();
         if (intent.action == FileIntent::Action::DELETE) {
-            const auto res = execute_file_intent(m_path, intent);
-            is_conflict = is_conflict || (res == FileIntentExecuteResult::ERROR);
+            try {
+                execute_file_intent(m_path, intent);
+            } catch (std::exception& e) {
+                push_error(e.what());
+            }
         }
     }
 
@@ -239,12 +249,13 @@ bool AppFolder::execute_actions() {
     for (auto& [_, file_state]: intents) {
         auto& intent = file_state.GetIntent();
         if (intent.action != FileIntent::Action::DELETE) {
-            const auto res = execute_file_intent(m_path, intent);
-            is_conflict = is_conflict || (res == FileIntentExecuteResult::ERROR);
+            try {
+                execute_file_intent(m_path, intent);
+            } catch (std::exception& e) {
+                push_error(e.what());
+            }
         }
     }
-
-    return !is_conflict;
 }
 
 // execute the shell command to open the folder or file

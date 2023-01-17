@@ -10,20 +10,18 @@
 namespace app
 {
 
-AppCredentials load_credentials_from_filepath(const char* filename)
+tl::expected<AppCredentials, std::string> load_credentials_from_filepath(const char* filename)
 {
     auto load_result = util::load_document_from_file(filename);
     if (load_result.code != util::DocumentLoadCode::OK) {
         auto err = fmt::format("Failed to load credentials json from: {}", filename);
-        spdlog::error(err);
-        throw std::runtime_error(err);
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     auto& doc = load_result.doc;
     if (!util::validate_document(doc, CREDENTIALS_SCHEMA)) {
         auto err = fmt::format("Credentials file ({}) has invalid format", filename); 
-        spdlog::error(err);
-        throw std::runtime_error(err);
+        return tl::make_unexpected<std::string>(std::move(err));
     }
 
     auto credentials = AppCredentials();
@@ -31,10 +29,12 @@ AppCredentials load_credentials_from_filepath(const char* filename)
     credentials.user_key = doc["credentials"]["userkey"].GetString();
     credentials.username = doc["credentials"]["username"].GetString();
 
-    if (doc["token"].IsString()) {
-        credentials.token = doc["token"].GetString();
-    } else {
-        credentials.token = std::nullopt; 
+    if (doc.HasMember("token")) {
+        if (doc["token"].IsString()) {
+            credentials.token = doc["token"].GetString();
+        } else {
+            credentials.token = std::nullopt; 
+        }
     }
 
     return credentials;

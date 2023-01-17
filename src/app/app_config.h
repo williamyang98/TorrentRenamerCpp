@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include "util/expected.hpp"
 
 namespace app {
 
@@ -13,7 +14,6 @@ struct AppConfig {
     std::vector<std::string> whitelist_tags; 
 };
 
-// THROWS: Runtime error with descriptor message
-AppConfig load_app_config_from_filepath(const char* filename);
+tl::expected<AppConfig, std::string> load_app_config_from_filepath(const char* filename);
 
 }

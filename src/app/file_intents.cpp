@@ -144,9 +144,9 @@ std::vector<FileIntent> get_directory_file_intents(
     return intents;
 }
 
-FileIntentExecuteResult execute_file_intent(const std::filesystem::path& root, const FileIntent& intent) {
+void execute_file_intent(const std::filesystem::path& root, const FileIntent& intent) {
     if (!intent.is_active) {
-        return FileIntentExecuteResult::NO_CHANGE;
+        return;
     }
 
     // NOTE: We don't care if we are deleting a file that has a filepath conflict
@@ -154,37 +154,23 @@ FileIntentExecuteResult execute_file_intent(const std::filesystem::path& root, c
     //       that is the same as an upcoming renamed filepath
     if (intent.action == FileIntent::Action::DELETE) {
         auto src_path = root / intent.src;
-        try {
-            fs::remove(src_path);
-            return FileIntentExecuteResult::SUCCESS;
-        } catch (fs::filesystem_error& ex) {
-            spdlog::warn(fmt::format("Failed to remove file ({}): {}", src_path.string(), ex.what()));
-            return FileIntentExecuteResult::ERROR;
-        }
+        fs::remove(src_path);
+        return;
     }
 
     // NOTE: Prevent overriding of files in event of conflict
     if (intent.is_conflict) {
-        return FileIntentExecuteResult::NO_CHANGE;
+        return;
     }
 
     if (intent.action == FileIntent::Action::RENAME) {
         auto src_path = root / intent.src;
         auto dest_path = root / intent.dest;
-        try {
-            auto dest_path_folder = fs::path(dest_path).remove_filename();
-            fs::create_directories(dest_path_folder);
-            fs::rename(src_path, dest_path);
-            return FileIntentExecuteResult::SUCCESS;
-        } catch (fs::filesystem_error& ex) {
-            spdlog::warn(fmt::format(
-                "Failed to rename pending file ({}) to ({}): {}", 
-                src_path.string(), dest_path.string(), ex.what()));
-            return FileIntentExecuteResult::ERROR;
-        } 
+        auto dest_path_folder = fs::path(dest_path).remove_filename();
+        fs::create_directories(dest_path_folder);
+        fs::rename(src_path, dest_path);
+        return;
     }
-
-    return FileIntentExecuteResult::NO_CHANGE;
 }
 
 };
