@@ -7,8 +7,8 @@
 
 #define TITLE_PATTERN  "([a-zA-Z\\.\\s\\-]*)[^a-zA-Z\\.\\s\\-]*"
 #define EXT_PATTERN  "\\.([a-zA-Z0-9]+)"
-const std::regex TAG_REGEX("[\\[\\(]([a-zA-Z0-9]{2,})[\\]\\)]");
-const std::vector<std::regex> SEASON_EPISODE_EXT_REGEXES = {
+static const std::regex TAG_REGEX("[\\[\\(]([a-zA-Z0-9]{2,})[\\]\\)]");
+static const std::vector<std::regex> SEASON_EPISODE_EXT_REGEXES = {
     std::regex(TITLE_PATTERN "[Ss](\\d+)\\s*[Ee](\\d+)(.*)" EXT_PATTERN),
     std::regex(TITLE_PATTERN "[Ss]eason\\s*(\\d+)\\s*[Ee]pisode\\s*(\\d+)(.*)" EXT_PATTERN),
     std::regex(TITLE_PATTERN "(\\d+)\\s*x\\s*(\\d+)(.*)" EXT_PATTERN),
@@ -40,8 +40,8 @@ std::optional<FileDescriptor> find_descriptor(const std::string& filename) {
 };
 
 std::string clean_name(const std::string& name) {
-    const std::regex remove_regex("[',\\(\\)\\[\\]]");
-    const std::regex replace_regex("[^a-zA-Z0-9]+");
+    static const std::regex remove_regex("[',\\(\\)\\[\\]]");
+    static const std::regex replace_regex("[^a-zA-Z0-9]+");
 
     std::string new_name = std::regex_replace(name, remove_regex, "");
     new_name = std::regex_replace(new_name, replace_regex, " ");
@@ -51,9 +51,9 @@ std::string clean_name(const std::string& name) {
 }
 
 std::string clean_title(const std::string& title) {
-    const std::regex remove_regex("[',\\(\\)\\[\\]]");
-    const std::regex remove_tags("[\\[\\(].*[\\)\\]]");
-    const std::regex replace_regex("[^a-zA-Z0-9]+");
+    static const std::regex remove_regex("[',\\(\\)\\[\\]]");
+    static const std::regex remove_tags("[\\[\\(].*[\\)\\]]");
+    static const std::regex replace_regex("[^a-zA-Z0-9]+");
 
     std::string new_title = std::regex_replace(title, remove_tags, "");
     new_title = std::regex_replace(new_title, remove_regex, "");
