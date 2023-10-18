@@ -12,7 +12,7 @@ struct SeriesInfo {
     std::string name;
     std::string air_date;
     std::string status;
-    std::optional<std::string> overview;
+    std::optional<std::string> overview = std::nullopt;
 };
 
 // stores info about an episode 
@@ -22,12 +22,13 @@ struct EpisodeInfo {
     int episode = 0;
     std::string air_date;
     std::string name;
+    std::optional<std::string> overview = std::nullopt;
 };
 
 // key for unordered map for episode lookup
 struct EpisodeKey {
-    const int season;
-    const int episode;
+    int season;
+    int episode;
 
     const int GetHash() const {
         return (season * (1 << 16)) + episode;

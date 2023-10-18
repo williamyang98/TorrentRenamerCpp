@@ -105,6 +105,7 @@ FileIntent get_file_intent(
     const auto fs_new_filepath = fs::path(new_folder) / fs::path(new_filename);
     const auto new_filepath = fs_new_filepath.string();
     const bool is_same_filepath = (fs_filepath == fs_new_filepath);
+    intent.descriptor = tvdb_api::EpisodeKey { descriptor.season, descriptor.episode };
 
     if (is_same_filepath) {
         intent.action = FileIntent::Action::COMPLETE;

@@ -14,6 +14,7 @@
 
 #include "app/app_folder_bookmarks.h"
 #include "font_awesome_definitions.h"
+#include "tvdb_api/tvdb_models.h"
 
 #include "os_dep.h"
 
@@ -27,10 +28,7 @@ namespace fs = std::filesystem;
 static void RenderSeriesList(App& main_app);
 static void RenderSeriesSelectModal(App& main_app, AppFolder& folder);
 static void RenderEpisodes(App& main_app);
-static void RenderEpisodesGenericList(
-    AppFolder& folder, const char* table_id, FileIntent::Action action, 
-    ImGuiTextFilter& search_filter,
-    int& selected_idx);
+static void RenderEpisodesGenericList(AppFolder& folder, const char* table_id, FileIntent::Action action, ImGuiTextFilter& search_filter);
 static void RenderFilesComplete(AppFolder& folder);
 static void RenderFilesIgnore(AppFolder& folder);
 static void RenderFilesRename(AppFolder& folder);
@@ -38,7 +36,8 @@ static void RenderFilesDelete(AppFolder& folder);
 static void RenderFilesConflict(AppFolder& folder);
 static void RenderFilesWhitelist(AppFolder& folder);
 static void RenderFileContextMenu(AppFolder& folder, AppFileState& intent, const char* label);
-static void RenderCacheInfo(App& main_app);
+static void RenderSeriesInfo(App& main_app);
+static void RenderEpisodeInfo(App& main_app);
 static void RenderErrors(App& main_app);
 static void RenderAppWarnings(App& main_app);
 static void RenderAppErrors(App& main_app);
@@ -61,25 +60,6 @@ struct {
         whitelists.Clear();
     }
 } CategoryFilters;
-
-// our global selection ids
-struct {
-    int completes;
-    int ignores;
-    int renames;
-    int deletes;
-    int conflicts;
-    int whitelists;
-
-    void ClearAll() {
-        completes = -1;
-        ignores = -1;
-        renames = -1;
-        deletes = -1;
-        conflicts = -1;
-        whitelists = -1;
-    }
-} CategorySelectedIndex;
 
 struct FileActionStringPair {
     FileIntent::Action action;
@@ -124,8 +104,12 @@ void RenderApp(App& main_app) {
     RenderEpisodes(main_app);
     ImGui::End();
 
-    ImGui::Begin("Info panel");
-    RenderCacheInfo(main_app);
+    ImGui::Begin("Series info");
+    RenderSeriesInfo(main_app);
+    ImGui::End();
+
+    ImGui::Begin("Episode info");
+    RenderEpisodeInfo(main_app);
     ImGui::End();
 
     ImGui::Begin("Errors");
@@ -256,27 +240,27 @@ void RenderSeriesList(App& main_app) {
 void RenderFileContextMenu(AppFolder& folder, AppFileState& intent, const char* label) {
     if (ImGui::IsItemHovered()) {
         // Shortcuts
-        if (intent.GetAction() != FileIntent::DELETE) {
+        if (intent.GetAction() != FileIntent::Action::DELETE) {
             if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
-                intent.SetAction(FileIntent::DELETE);
+                intent.SetAction(FileIntent::Action::DELETE);
                 intent.SetIsActive(false);
             }
         }
-        if (intent.GetAction() != FileIntent::RENAME) {
+        if (intent.GetAction() != FileIntent::Action::RENAME) {
             if (ImGui::IsKeyPressed(ImGuiKey_R, false) && ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
-                intent.SetAction(FileIntent::RENAME);
+                intent.SetAction(FileIntent::Action::RENAME);
                 intent.SetIsActive(false);
             }
         }
-        if (intent.GetAction() != FileIntent::IGNORE) {
+        if (intent.GetAction() != FileIntent::Action::IGNORE) {
             if (ImGui::IsKeyPressed(ImGuiKey_I, false) && ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
-                intent.SetAction(FileIntent::IGNORE);
+                intent.SetAction(FileIntent::Action::IGNORE);
                 intent.SetIsActive(false);
             }
         }
-        if (intent.GetAction() != FileIntent::WHITELIST) {
+        if (intent.GetAction() != FileIntent::Action::WHITELIST) {
             if (ImGui::IsKeyPressed(ImGuiKey_W, false) && ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
-                intent.SetAction(FileIntent::WHITELIST);
+                intent.SetAction(FileIntent::Action::WHITELIST);
                 intent.SetIsActive(false);
             }
         }
@@ -329,7 +313,6 @@ void RenderEpisodes(App& main_app) {
     static AppFolder* prev_folder = nullptr;
     if (prev_folder != main_app.m_current_folder.get()) {
         CategoryFilters.ClearAll();
-        CategorySelectedIndex.ClearAll();
     }
     prev_folder = main_app.m_current_folder.get();
 
@@ -490,11 +473,7 @@ void RenderBookmarks(AppFolderBookmarks& bookmarks, const std::string& filename)
     }
 }
 
-void RenderEpisodesGenericList(
-        AppFolder& folder, const char* table_id, FileIntent::Action action, 
-        ImGuiTextFilter& search_filter,
-        int& selected_idx) 
-{
+void RenderEpisodesGenericList(AppFolder& folder, const char* table_id, FileIntent::Action action, ImGuiTextFilter& search_filter) {
     search_filter.Draw();
 
     auto& state = folder.m_state;
@@ -524,15 +503,15 @@ void RenderEpisodesGenericList(
             ImGui::PushID(i++);
             ImGui::TableSetColumnIndex(0);
             const char* popup_key = "##intent action popup";
-            const bool is_selected = (i == selected_idx);
+            const bool is_selected = folder.selected_episode.has_value() && (folder.selected_episode == intent.GetIntent().descriptor);
 
             RenderBookmarks(folder.m_bookmarks, intent.GetSrc());
             ImGui::SameLine();
             if (ImGui::Selectable(name, is_selected)) {
                 if (is_selected) {
-                    selected_idx = -1;
+                    folder.selected_episode = std::nullopt;
                 } else {
-                    selected_idx = i;
+                    folder.selected_episode = intent.GetIntent().descriptor;
                 }
             }
             RenderFileContextMenu(folder, intent, popup_key);
@@ -545,24 +524,15 @@ void RenderEpisodesGenericList(
 }
 
 void RenderFilesComplete(AppFolder& folder) {
-    RenderEpisodesGenericList(
-            folder, "##completed table", FileIntent::Action::COMPLETE,
-            CategoryFilters.completes,
-            CategorySelectedIndex.completes);
+    RenderEpisodesGenericList(folder, "##completed table", FileIntent::Action::COMPLETE, CategoryFilters.completes);
 }
 
 void RenderFilesIgnore(AppFolder& folder) {
-    RenderEpisodesGenericList(
-            folder, "##ignore table", FileIntent::Action::IGNORE,
-            CategoryFilters.ignores,
-            CategorySelectedIndex.ignores);
+    RenderEpisodesGenericList(folder, "##ignore table", FileIntent::Action::IGNORE, CategoryFilters.ignores);
 }
 
 void RenderFilesWhitelist(AppFolder& folder) {
-    RenderEpisodesGenericList(
-            folder, "##whitelist table", FileIntent::Action::WHITELIST,
-            CategoryFilters.whitelists,
-            CategorySelectedIndex.whitelists);
+    RenderEpisodesGenericList(folder, "##whitelist table", FileIntent::Action::WHITELIST, CategoryFilters.whitelists);
 }
 
 void RenderFilesRename(AppFolder& folder) {
@@ -594,7 +564,6 @@ void RenderFilesRename(AppFolder& folder) {
         ImGui::TableHeadersRow();
 
         int row_id  = 0;
-        int& selected_idx = CategorySelectedIndex.renames;
         for (auto& [key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::RENAME) continue; 
 
@@ -632,12 +601,12 @@ void RenderFilesRename(AppFolder& folder) {
 
             const char* popup_id = "##intent action popup";
             ImGui::SameLine();
-            const bool is_selected = (row_id == selected_idx);
+            const bool is_selected = folder.selected_episode.has_value() && (folder.selected_episode == intent.GetIntent().descriptor);
             if (ImGui::Selectable("###row popup button", is_selected, ImGuiSelectableFlags_SpanAllColumns)) {
                 if (is_selected) {
-                    selected_idx = -1;
+                    folder.selected_episode = std::nullopt;
                 } else {
-                    selected_idx = row_id;
+                    folder.selected_episode = intent.GetIntent().descriptor;
                 }
             }
             RenderFileContextMenu(folder, intent, popup_id);
@@ -681,7 +650,6 @@ void RenderFilesDelete(AppFolder& folder) {
         ImGui::TableHeadersRow();
 
         int i = 0;
-        int& selected_idx = CategorySelectedIndex.deletes;
         for (auto& [key, intent]: state->GetIntents()) {
             if (intent.GetAction() != FileIntent::Action::DELETE) continue; 
 
@@ -713,12 +681,12 @@ void RenderFilesDelete(AppFolder& folder) {
             ImGui::SameLine();
 
             const char* popup_id = "##intent action popup";
-            const bool is_selected = (i == selected_idx);
+            const bool is_selected = folder.selected_episode.has_value() && (folder.selected_episode == intent.GetIntent().descriptor);
             if (ImGui::Selectable("##action popup row", false, ImGuiSelectableFlags_SpanAllColumns)) {
                 if (is_selected) {
-                    selected_idx = -1;
+                    folder.selected_episode = std::nullopt;
                 } else {
-                    selected_idx = i;
+                    folder.selected_episode = intent.GetIntent().descriptor;
                 }
             }
 
@@ -815,7 +783,7 @@ void RenderFilesConflict(AppFolder& folder) {
     ImGui::EndChild();
 }
 
-void RenderCacheInfo(App& main_app) {
+void RenderSeriesInfo(App& main_app) {
     if (main_app.m_current_folder == nullptr) {
         return;
     }
@@ -829,22 +797,13 @@ void RenderCacheInfo(App& main_app) {
         return;
     }
 
-    ImGui::TextWrapped("Cached Info");
-
-    ImGuiTableFlags flags = 
-        ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | 
-        ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable;
-
-    auto& series = cache.series;
+    const auto& series = cache.series;
+    const ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable;
 
     if (ImGui::BeginTable("Series", 2, flags)) {
-        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed);
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableHeadersRow();
-
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        ImGui::Text("Series ID"); 
+        ImGui::Text("ID"); 
         ImGui::TableSetColumnIndex(1);
         ImGui::TextWrapped("%d", series.id);
 
@@ -877,6 +836,74 @@ void RenderCacheInfo(App& main_app) {
 
         ImGui::EndTable();
     }
+
+}
+
+void RenderEpisodeInfo(App& main_app) {
+    if (main_app.m_current_folder == nullptr) {
+        return;
+    }
+
+    auto& folder = *main_app.m_current_folder;
+    std::scoped_lock cache_lock(folder.m_cache_mutex);
+    const auto& cache = folder.m_cache;
+    const auto& is_cached = folder.m_is_info_cached;
+    if (!is_cached) {
+        ImGui::TextWrapped("Cache is missing");
+        return;
+    }
+
+    auto& episodes = cache.episodes;
+    if (!folder.selected_episode.has_value()) {
+        ImGui::TextWrapped("No episode selected");
+        return;
+    }
+    auto res = episodes.find(folder.selected_episode.value());
+    if (res == episodes.end()) {
+        ImGui::TextWrapped("No episode selected");    
+        return;
+    }
+    const auto& episode = res->second;
+
+    const ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable;
+
+    if (ImGui::BeginTable("Episodes", 2, flags)) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::Text("ID"); 
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextWrapped("%d", episode.id);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::Text("Index"); 
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextWrapped("S%02dE%02d", episode.season, episode.episode);
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::Text("Name"); 
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextWrapped("%*s", int(episode.name.size()), episode.name.c_str());
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::Text("Air Date"); 
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextWrapped("%*s", int(episode.air_date.size()), episode.air_date.c_str());
+
+        if (episode.overview) {
+            auto& label = episode.overview.value();
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("Overview"); 
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("%s", label.c_str());
+        }
+
+        ImGui::EndTable();
+    }
+
 }
 
 void RenderErrors(App& main_app) {

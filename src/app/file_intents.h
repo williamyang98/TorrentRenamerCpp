@@ -1,15 +1,19 @@
 #pragma once
 
+#include <stdint.h>
 #include <filesystem>
 #include <vector>
 #include <string>
+#include <optional>
 #include "tvdb_api/tvdb_models.h"
 
 namespace app 
 {
 
+// TODO: The metadata for different actions is stored in the same struct
+//        We could use a variant here to save memory possibly
 struct FileIntent {
-    enum Action {
+    enum class Action: uint8_t {
         RENAME      = 1<<0,
         COMPLETE    = 1<<1,
         IGNORE      = 1<<2,
@@ -22,6 +26,7 @@ struct FileIntent {
     Action action = Action::IGNORE;
     bool is_conflict = false; 
     bool is_active = false;   
+    std::optional<tvdb_api::EpisodeKey> descriptor = std::nullopt;
 };
 
 struct FilterRules {

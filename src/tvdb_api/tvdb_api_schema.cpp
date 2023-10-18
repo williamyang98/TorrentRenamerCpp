@@ -33,13 +33,13 @@ R"({
     "items": {
         "type": "object",
         "properties": {
-        "id": { "type": "number", "exclusiveMinimum": 0 },
-        "seriesName": { "type": "string" },
-        "firstAired": { "type": "string" },
-        "status": { "type": "string" },
-        "overview": { "type": "string" }
-    },
-    "required": ["id", "seriesName", "firstAired", "status"]
+            "id": { "type": "number", "exclusiveMinimum": 0 },
+            "seriesName": { "type": "string" },
+            "firstAired": { "type": "string" },
+            "status": { "type": "string" },
+            "overview": { "type": "string" }
+        },
+        "required": ["id", "seriesName", "firstAired", "status"]
     }
 })";
 
@@ -66,11 +66,12 @@ R"({
     "items": {
         "type": "object",
         "properties": {
-        "id": { "type": "number", "exclusiveMinimum": 0 },
-        "airedSeason": { "type": "number", "exclusiveMinimum": 0 },
-        "airedEpisodeNumber": { "type": "number", "exclusiveMinimum": 0 },
-        "firstAired": { "type": ["string", "null"] },
-        "episodeName": { "type": ["string", "null"] }
+            "id": { "type": "number", "exclusiveMinimum": 0 },
+            "airedSeason": { "type": "number", "exclusiveMinimum": 0 },
+            "airedEpisodeNumber": { "type": "number", "exclusiveMinimum": 0 },
+            "firstAired": { "type": ["string", "null"] },
+            "episodeName": { "type": ["string", "null"] },
+            "overview": { "type": "string" }
         },
         "required": ["id", "airedSeason", "airedEpisodeNumber", "firstAired", "episodeName"]
     }

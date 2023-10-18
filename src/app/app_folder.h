@@ -7,6 +7,7 @@
 #include <atomic>
 #include <vector>
 #include <list>
+#include <optional>
 
 #include "file_intents.h"
 #include "app_folder_state.h"
@@ -60,6 +61,8 @@ public:
     // store bookmarks for current folder
     AppFolderBookmarks m_bookmarks;
     std::mutex m_bookmarks_mutex;
+
+    std::optional<tvdb_api::EpisodeKey> selected_episode = std::nullopt;
 
     // use this to keep count of the global count of busy folders
     std::atomic<bool> m_is_busy;

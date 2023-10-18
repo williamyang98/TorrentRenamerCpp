@@ -53,7 +53,9 @@ tl::expected<EpisodesMap, const char*> load_series_episodes_info(const rapidjson
         ep.episode = e["airedEpisodeNumber"].GetInt();
         ep.air_date = get_string_default(e["firstAired"]);
         ep.name = get_string_default(e["episodeName"]);
-        
+        if (e.HasMember("overview")) {
+            ep.overview = e["overview"].IsString() ? e["overview"].GetString() : "";
+        }
         EpisodeKey key {ep.season, ep.episode};
         episodes[key] = ep;
     }
