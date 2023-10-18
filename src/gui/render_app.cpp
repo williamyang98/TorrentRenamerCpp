@@ -141,7 +141,7 @@ void RenderSeriesList(App& main_app) {
 
     snprintf(
         LABEL_BUFFER, MAX_BUFFER_SIZE,
-        "Series (%llu)###Series", folders.size());
+        "Series (%zu)###Series", folders.size());
     
     ImGuiWindowFlags win_flags = ImGuiWindowFlags_MenuBar;
     ImGui::Begin(LABEL_BUFFER, NULL, win_flags);
@@ -994,7 +994,7 @@ void RenderAppWarnings(App& main_app) {
     static char window_name[MAX_BUFFER_SIZE+1] = {0};
     snprintf(
             window_name, MAX_BUFFER_SIZE, 
-            "Warnings (%llu)###application warnings", warnings.size()); 
+            "Warnings (%zu)###application warnings", warnings.size()); 
 
     ImGui::Begin(window_name);
     if (ImGui::BeginListBox("##Warning List", ImVec2(-1,-1))) {
