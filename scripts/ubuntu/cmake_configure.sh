@@ -1,0 +1,2 @@
+#!/bin/sh
+cmake . -B build-ubuntu -G Ninja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE

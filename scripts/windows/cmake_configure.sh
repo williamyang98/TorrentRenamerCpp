@@ -1,6 +1,6 @@
 #!/bin/sh
 if [[ -z "$BUILD_OUT" ]]; then
-    BUILD_OUT="build"
+    BUILD_OUT="build-windows"
 fi
 
 if [[ -z "$BUILD_TYPE" ]]; then

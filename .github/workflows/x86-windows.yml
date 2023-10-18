@@ -41,15 +41,15 @@ jobs:
 
     - name: Configure CMake
       shell: bash
-      run: CC=clang CXX=clang++ ./scripts/cmake_configure.sh
+      run: CC=clang CXX=clang++ ./scripts/windows/cmake_configure.sh
 
     - name: Build
       shell: bash
-      run: ninja -C build
+      run: ninja -C build-windows
 
     - name: Copy files 
       shell: bash
-      run: ./toolchains/windows/create_package.sh
+      run: ./scripts/windows/create_package.sh
 
     - name: Upload files 
       uses: actions/upload-artifact@v3

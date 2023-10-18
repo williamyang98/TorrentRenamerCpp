@@ -1,6 +1,6 @@
 #!/bin/bash
 output_dir="torrent_renamer_cpp_windows_x64"
-build_dir="build"
+build_dir="build-windows"
 
 # clean directory
 rm -rf ${output_dir}

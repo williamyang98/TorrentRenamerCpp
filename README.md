@@ -23,6 +23,8 @@ You can check out the [tvdb dashboard](https://thetvdb.com/dashboard) for your a
 
 # Building
 1. Setup development environment for Windows or Ubuntu.
-2. ```CC=clang CXX=clang++ ./scripts/cmake_configure.sh```.
-3. ```ninja -C build```
-4. ```./build/main /your_directory```
+2. ```CC=clang CXX=clang++ ./scripts/windows/cmake_configure.sh```.
+3. ```ninja -C build-windows```
+4. ```./build-windows/main /your_directory```
+
+Replace ```build-windows``` with ```build-ubuntu``` for Ubuntu builds.
