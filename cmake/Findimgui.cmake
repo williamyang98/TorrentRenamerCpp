@@ -1,13 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(imgui)
 
-# find_package(glfw REQUIRED)
-# find_package(OpenGL REQUIRED)
+find_package(OpenGL REQUIRED)
 
 if (WIN32)
 set(IMGUI_EXTERNAL_LIBS opengl32.lib)
 else()
-set(IMGUI_EXTERNAL_LIBS GL)
+set(IMGUI_EXTERNAL_LIBS GL dl)
 endif(WIN32)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/vendor/imgui)
