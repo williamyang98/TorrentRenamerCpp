@@ -10,4 +10,5 @@ logs.txt
 .cache/
 
 res/credentials.json
-torrent_renamer_cpp_windows_x64/
+torrent_renamer_cpp_*_x64/
+torrent_renamer_cpp_*_x64.zip

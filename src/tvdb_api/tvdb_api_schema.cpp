@@ -71,7 +71,7 @@ R"({
             "airedEpisodeNumber": { "type": "number", "exclusiveMinimum": 0 },
             "firstAired": { "type": ["string", "null"] },
             "episodeName": { "type": ["string", "null"] },
-            "overview": { "type": "string" }
+            "overview": { "type": ["string", "null"] }
         },
         "required": ["id", "airedSeason", "airedEpisodeNumber", "firstAired", "episodeName"]
     }
