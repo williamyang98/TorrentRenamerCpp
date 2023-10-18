@@ -5,9 +5,12 @@
 #include <memory>
 #include <mutex>
 #include <atomic>
+#include <vector>
+#include <list>
 
 #include "file_intents.h"
 #include "app_folder_state.h"
+#include "app_folder_bookmarks.h"
 #include "tvdb_api/tvdb_models.h"
 
 namespace app {
@@ -35,6 +38,7 @@ public:
     FilterRules& m_cfg;
 
     // keep a mutex on members which are used in rendering and undergo mutation during actions
+
     // cache of tvdb data
     tvdb_api::TVDB_Cache m_cache;
     bool m_is_info_cached;
@@ -53,6 +57,10 @@ public:
     std::vector<tvdb_api::SeriesInfo> m_search_result;
     std::mutex m_search_mutex;
 
+    // store bookmarks for current folder
+    AppFolderBookmarks m_bookmarks;
+    std::mutex m_bookmarks_mutex;
+
     // use this to keep count of the global count of busy folders
     std::atomic<bool> m_is_busy;
     std::atomic<int>& m_global_busy_count;
@@ -68,6 +76,9 @@ public:
     bool load_cache_from_file();
     void update_state_from_cache();
     bool load_search_series_from_tvdb(const char* name, const char* token);
+    bool load_bookmarks_from_file();
+    bool save_bookmarks_to_file();
+
     void execute_actions();
     const auto&  GetPath() const { return m_path; }
     void open_folder(const std::string& path);

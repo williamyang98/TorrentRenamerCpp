@@ -12,6 +12,7 @@
 #include <imgui_stdlib.h>
 #include <fmt/format.h>
 
+#include "app/app_folder_bookmarks.h"
 #include "font_awesome_definitions.h"
 
 #include "os_dep.h"
@@ -36,7 +37,7 @@ static void RenderFilesRename(AppFolder& folder);
 static void RenderFilesDelete(AppFolder& folder);
 static void RenderFilesConflict(AppFolder& folder);
 static void RenderFilesWhitelist(AppFolder& folder);
-static void RenderFileIntentChange(AppFolder& folder, AppFileState& intent, const char* label);
+static void RenderFileContextMenu(AppFolder& folder, AppFileState& intent, const char* label);
 static void RenderCacheInfo(App& main_app);
 static void RenderErrors(App& main_app);
 static void RenderAppWarnings(App& main_app);
@@ -83,14 +84,15 @@ struct {
 struct FileActionStringPair {
     FileIntent::Action action;
     const char* str;
+    const char* shortcut;
 };
 
 std::array<FileActionStringPair, 5> FileActionToString = {{
-    { FileIntent::Action::DELETE, "Delete" },
-    { FileIntent::Action::IGNORE, "Ignore" },
-    { FileIntent::Action::RENAME, "Rename" },
-    { FileIntent::Action::COMPLETE, "Complete" },
-    { FileIntent::Action::WHITELIST, "Whitelist" },
+    { FileIntent::Action::DELETE, "Delete", "Del" },
+    { FileIntent::Action::IGNORE, "Ignore", "Alt+i" },
+    { FileIntent::Action::RENAME, "Rename", "Alt+r" },
+    { FileIntent::Action::WHITELIST, "Whitelist", "Alt+w" },
+    { FileIntent::Action::COMPLETE, "Complete", "Alt+c" },
 }};
 
 // our global colors
@@ -171,7 +173,7 @@ void RenderSeriesList(App& main_app) {
     }
     ImGui::EndDisabled();
 
-    ImGui::Text("Total busy folders (%d/%d)", busy_count, folders.size());
+    ImGui::Text("Total busy folders (%d/%zu)", busy_count, folders.size());
 
     ImGui::Separator();
     static ImGuiTextFilter search_filter;
@@ -240,6 +242,7 @@ void RenderSeriesList(App& main_app) {
                 main_app.m_current_folder = folder;
                 main_app.queue_async_call([&folder](int pid) {
                     folder->update_state_from_cache();
+                    folder->load_bookmarks_from_file();
                 });
             }
             ImGui::PopID();
@@ -250,25 +253,68 @@ void RenderSeriesList(App& main_app) {
     ImGui::End();
 }
 
-void RenderFileIntentChange(AppFolder& folder, AppFileState& intent, const char* label) {
+void RenderFileContextMenu(AppFolder& folder, AppFileState& intent, const char* label) {
+    if (ImGui::IsItemHovered()) {
+        // Shortcuts
+        if (intent.GetAction() != FileIntent::DELETE) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
+                intent.SetAction(FileIntent::DELETE);
+                intent.SetIsActive(false);
+            }
+        }
+        if (intent.GetAction() != FileIntent::RENAME) {
+            if (ImGui::IsKeyPressed(ImGuiKey_R, false) && ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
+                intent.SetAction(FileIntent::RENAME);
+                intent.SetIsActive(false);
+            }
+        }
+        if (intent.GetAction() != FileIntent::IGNORE) {
+            if (ImGui::IsKeyPressed(ImGuiKey_I, false) && ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
+                intent.SetAction(FileIntent::IGNORE);
+                intent.SetIsActive(false);
+            }
+        }
+        if (intent.GetAction() != FileIntent::WHITELIST) {
+            if (ImGui::IsKeyPressed(ImGuiKey_W, false) && ImGui::IsKeyDown(ImGuiKey_LeftAlt)) {
+                intent.SetAction(FileIntent::WHITELIST);
+                intent.SetIsActive(false);
+            }
+        }
+    }
+
+    const auto& style = ImGui::GetStyle();
+    
     if (ImGui::BeginPopupContextItem()) {
+        const auto& filename = intent.GetSrc();
+
         if (ImGui::Selectable("Open folder")) {
-            folder.open_folder(intent.GetSrc());
+            folder.open_folder(filename);
         }
         if (ImGui::Selectable("Open file")) {
-            folder.open_file(intent.GetSrc());
+            folder.open_file(filename);
         }
 
         ImGui::Separator();
 
         for (auto& p: FileActionToString) {
-            if ((intent.GetAction() != p.action) && ImGui::Selectable(p.str, false, 0)) 
-            {
+            if (intent.GetAction() == p.action) {
+                continue;
+            }
+
+            const bool is_pressed = ImGui::Selectable(p.str, false, 0);
+            ImGui::SameLine();
+            static const int WINDOW_WIDTH = ImGui::CalcTextSize("Whitelist         Alt+w").x;
+            ImGui::SetCursorPosX(WINDOW_WIDTH - ImGui::CalcTextSize(p.shortcut).x);
+            ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+            ImGui::Text("%s", p.shortcut);
+            ImGui::PopStyleColor();
+            if (is_pressed) {
                 intent.SetAction(p.action);
                 intent.SetIsActive(false);
                 ImGui::CloseCurrentPopup();
             }
         }
+
         ImGui::EndPopup();
     }
 }
@@ -331,6 +377,8 @@ void RenderEpisodes(App& main_app) {
 
     // render the state tree
     std::scoped_lock state_lock(folder.m_state_mutex);
+    std::scoped_lock bookmarks_lock(folder.m_bookmarks_mutex);
+
     auto& state = folder.m_state;
     auto& counts = state->GetActionCount();
 
@@ -387,7 +435,59 @@ void RenderEpisodes(App& main_app) {
     if (show_tab_bar) {
         ImGui::EndTabBar();
     }
+    
+    if (folder.m_bookmarks.m_is_dirty) {
+        folder.m_bookmarks.m_is_dirty = false;
+        main_app.queue_async_call([&folder, &main_app](int pid) {
+            folder.save_bookmarks_to_file();
+        });
+    }
+}
 
+void RenderBookmarks(AppFolderBookmarks& bookmarks, const std::string& filename) {
+    auto& flags = bookmarks.GetFlags(filename);
+    bool is_changed = false;
+
+    const auto& style = ImGui::GetStyle();
+    
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.ItemSpacing.x/2, style.ItemSpacing.y));
+
+    if (flags.is_starred) ImGui::PushStyleColor(ImGuiCol_Text, ImColor(245,206,66).Value);
+    else                  ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+    ImGui::Text(ICON_FA_STAR);
+    if (ImGui::IsItemClicked()) {
+        flags.is_starred = !flags.is_starred;
+        is_changed = true;
+    }
+    ImGui::PopStyleColor();
+    
+    ImGui::SameLine();
+
+    if (flags.is_unread) ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255,0,0).Value);
+    else                 ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+    ImGui::Text(ICON_FA_QUESTION);
+    if (ImGui::IsItemClicked()) {
+        flags.is_unread = !flags.is_unread;
+        is_changed = true;
+    }
+    ImGui::PopStyleColor();
+
+    ImGui::SameLine();
+
+    if (flags.is_read) ImGui::PushStyleColor(ImGuiCol_Text, ImColor(0,255,0).Value);
+    else               ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+    ImGui::Text(ICON_FA_CHECK);
+    if (ImGui::IsItemClicked()) {
+        flags.is_read = !flags.is_read;
+        is_changed = true;
+    }
+    ImGui::PopStyleColor();
+
+    ImGui::PopStyleVar();
+    
+    if (is_changed) {
+        bookmarks.m_is_dirty = true;
+    }
 }
 
 void RenderEpisodesGenericList(
@@ -425,6 +525,9 @@ void RenderEpisodesGenericList(
             ImGui::TableSetColumnIndex(0);
             const char* popup_key = "##intent action popup";
             const bool is_selected = (i == selected_idx);
+
+            RenderBookmarks(folder.m_bookmarks, intent.GetSrc());
+            ImGui::SameLine();
             if (ImGui::Selectable(name, is_selected)) {
                 if (is_selected) {
                     selected_idx = -1;
@@ -432,7 +535,7 @@ void RenderEpisodesGenericList(
                     selected_idx = i;
                 }
             }
-            RenderFileIntentChange(folder, intent, popup_key);
+            RenderFileContextMenu(folder, intent, popup_key);
             ImGui::PopID();
         }
         ImGui::EndTable();
@@ -537,7 +640,7 @@ void RenderFilesRename(AppFolder& folder) {
                     selected_idx = row_id;
                 }
             }
-            RenderFileIntentChange(folder, intent, popup_id);
+            RenderFileContextMenu(folder, intent, popup_id);
 
             ImGui::PopID();
         }
@@ -619,7 +722,7 @@ void RenderFilesDelete(AppFolder& folder) {
                 }
             }
 
-            RenderFileIntentChange(folder, intent, popup_id);
+            RenderFileContextMenu(folder, intent, popup_id);
             ImGui::PopID();
         }
         ImGui::EndTable();
@@ -698,7 +801,7 @@ void RenderFilesConflict(AppFolder& folder) {
                         /* ImGui::OpenPopup(popup_label.c_str()); */
                     }
 
-                    RenderFileIntentChange(folder, intent, popup_label.c_str());
+                    RenderFileContextMenu(folder, intent, popup_label.c_str());
                     ImGui::PopID();
                 }
                 ImGui::PopID();

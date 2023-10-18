@@ -63,6 +63,24 @@ R"({
     "required": ["credentials"]
 })";
 
+const char* APP_FOLDER_BOOKMARKS_SCHEMA_CSTR = 
+R"({
+    "title": "app folder bookmarks",
+    "description": "Bookmarks for files in a folder",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "is_favourite": { "type": "boolean" },
+            "is_read": { "type": "boolean" },
+            "is_unread": { "type": "boolean" }
+        },
+        "required": ["id"]
+    }
+})";
+
+rapidjson::SchemaDocument APP_FOLDER_BOOKMARKS_SCHEMA_DOC = util::load_schema_from_cstr(APP_FOLDER_BOOKMARKS_SCHEMA_CSTR);
 rapidjson::SchemaDocument APP_SCHEMA_DOC = util::load_schema_from_cstr(APP_CONFIG_SCHEMA);
 rapidjson::SchemaDocument CREDENTIALS_SCHEMA = util::load_schema_from_cstr(CREDENTIALS_SCHEMA_STR);
 

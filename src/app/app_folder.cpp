@@ -1,5 +1,6 @@
 #include "app_folder.h"
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <memory>
@@ -8,6 +9,7 @@
 #include <fmt/core.h>
 
 #include "app_folder_state.h"
+#include "app_folder_bookmarks_json.h"
 #include "file_intents.h"
 #include "tvdb_api/tvdb_api.h"
 #include "tvdb_api/tvdb_models.h"
@@ -17,6 +19,7 @@
 
 constexpr const char* EPISODES_CACHE_FN = "episodes.json";
 constexpr const char* SERIES_CACHE_FN = "series.json";
+constexpr const char* BOOKMARKS_FN = "bookmarks.json";
 
 
 namespace app 
@@ -223,6 +226,52 @@ void AppFolder::update_state_from_cache() {
 
     auto lock = std::scoped_lock(m_state_mutex);
     m_state = std::move(new_state);
+}
+
+bool AppFolder::load_bookmarks_from_file() {
+    if (m_is_busy) return false;
+    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+
+    const fs::path bookmarks_fn = m_path / BOOKMARKS_FN;
+    auto res = util::load_document_from_file(bookmarks_fn.string().c_str());
+    if (res.code != util::DocumentLoadCode::OK) {
+        return false;
+    }
+
+    auto& doc = res.doc;
+    auto bookmarks_opt = load_app_folder_bookmarks(doc);
+    if (!bookmarks_opt) {
+        push_error(bookmarks_opt.error());
+        return false;
+    }
+
+    auto bookmarks = bookmarks_opt.value();
+    {
+        auto lock = std::scoped_lock(m_bookmarks_mutex);
+        m_bookmarks = std::move(bookmarks);
+    }
+    return true;
+}
+
+bool AppFolder::save_bookmarks_to_file() {
+    if (m_is_busy) return false;
+    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+
+    const fs::path bookmarks_fn = m_path / BOOKMARKS_FN;
+
+    std::string json_str;
+    {
+        auto lock = std::scoped_lock(m_bookmarks_mutex);
+        json_str = json_stringify_app_folder_bookmarks(m_bookmarks);
+    }
+
+    std::ofstream file(bookmarks_fn);
+    if (!file.is_open()) {
+        push_error("Failed to save bookmarks");
+        return false;
+    }
+    file << json_str << std::endl;
+    return true;    
 }
 
 // thread safe execute all actions in folder diff

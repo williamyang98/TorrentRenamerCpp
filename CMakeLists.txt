@@ -1,13 +1,19 @@
 cmake_minimum_required(VERSION 3.10)
 project(TorrentRenamer)
 
+find_package(curl CONFIG REQUIRED)
+
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(glfw REQUIRED)
 find_package(imgui REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
-find_package(cpr REQUIRED)
 find_package(rapidjson REQUIRED)
+
+set(CPR_FORCE_USE_SYSTEM_CURL ON CACHE BOOL "")
+set(CPR_ENABLE_SSL ON CACHE BOOL "")
+set(CPR_FORCE_WINSSL_BACKEND ON CACHE BOOL "")
+find_package(cpr REQUIRED)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 
@@ -30,6 +36,7 @@ add_library(app_lib STATIC
     ${SRC_DIR}/app/app_credentials.cpp
     ${SRC_DIR}/app/app_schemas.cpp
     ${SRC_DIR}/app/app_folder.cpp
+    ${SRC_DIR}/app/app_folder_bookmarks_json.cpp
     ${SRC_DIR}/app/app_folder_state.cpp
     ${SRC_DIR}/app/app_file_state.cpp
     ${SRC_DIR}/app/file_descriptor.cpp
@@ -58,9 +65,6 @@ target_include_directories(main PRIVATE ${SRC_DIR})
 target_compile_features(main PRIVATE cxx_std_17)
 target_link_libraries(main app_lib imgui)
 
-if (WIN32)
-target_compile_options(tvdb_api PRIVATE "/MP")
-target_compile_options(app_lib PRIVATE "/MP")
-target_compile_options(cli_test PRIVATE "/MP")
-target_compile_options(main PRIVATE "/MP")
-endif (WIN32)
+if(MSVC)
+    add_compile_options(/MP)
+endif(MSVC)
