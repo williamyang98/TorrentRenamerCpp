@@ -1,7 +1,13 @@
 .vscode/
 build/
+build-*/
+build_*/
 tests/
 
-res/credentials.json
 imgui.ini
 logs.txt
+
+.cache/
+
+res/credentials.json
+torrent_renamer_cpp_windows_x64/

@@ -1,18 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(TorrentRenamer)
 
-find_package(curl CONFIG REQUIRED)
-
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(glfw REQUIRED)
 find_package(imgui REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(rapidjson REQUIRED)
-
-set(CPR_FORCE_USE_SYSTEM_CURL ON CACHE BOOL "")
-set(CPR_ENABLE_SSL ON CACHE BOOL "")
-set(CPR_FORCE_WINSSL_BACKEND ON CACHE BOOL "")
 find_package(cpr REQUIRED)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)

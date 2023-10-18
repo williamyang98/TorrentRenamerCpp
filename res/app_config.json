@@ -5,7 +5,8 @@
     ],
     "whitelist_filenames": [
         "series.json",
-        "episodes.json"
+        "episodes.json",
+		"bookmarks.json"
     ],
     "blacklist_extensions": [
         ".nfo", ".exe"
