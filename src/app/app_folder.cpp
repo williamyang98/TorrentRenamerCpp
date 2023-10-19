@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <condition_variable>
 #include <spdlog/spdlog.h>
 #include <fmt/core.h>
 
@@ -27,22 +28,30 @@ namespace app
 
 namespace fs = std::filesystem;
 
-// Helper to raise/lower busy flags/counts
-class ScopedAtomic 
+// TODO: We force all operations on a folder to be atomic
+//       This means operations coming in from multiple threads will block each other
+//       This is because there is alot of inter data dependencies in our data structure 
+//       However it may be possible to have certain operations occur in parallel with other ones
+class BusyLock 
 {
 public:
-    std::atomic<bool>& m_var;
+    std::unique_lock<std::mutex> m_is_busy_lock;
+    bool& m_is_busy;
     std::atomic<int>& m_busy_count;
-    ScopedAtomic(std::atomic<bool>& var, std::atomic<int>& busy_count)
-    : m_var(var), m_busy_count(busy_count) {
-        m_var = true;
+    BusyLock(std::mutex& is_busy_mutex, bool& is_busy, std::atomic<int>& busy_count)
+    : m_is_busy_lock(is_busy_mutex), m_is_busy(is_busy), m_busy_count(busy_count) 
+    {
+        m_is_busy = true;
         m_busy_count++;
     }
-
-    ~ScopedAtomic() {
-        m_var = false;
+    ~BusyLock() {
+        m_is_busy = false;
         m_busy_count--;
     }
+    BusyLock(const BusyLock&) = delete;
+    BusyLock(BusyLock&&) = delete;
+    BusyLock& operator=(const BusyLock&) = delete;
+    BusyLock& operator=(BusyLock&&) = delete;
 };
 
 AppFolder::AppFolder(
@@ -52,22 +61,18 @@ AppFolder::AppFolder(
 : m_path(path), m_cfg(cfg), m_global_busy_count(busy_count) 
 {
     m_is_info_cached = false;
-    m_is_busy = false;
     m_status = AppFolder::Status::UNKNOWN;
     m_state = std::make_unique<AppFolderState>();
+    m_is_busy = false;
 }
 
-// thread safe push of error to list
 void AppFolder::push_error(const std::string& str) {
     std::scoped_lock lock(m_errors_mutex);
     m_errors.push_back(str);
 }
 
-// thread safe load series search results from tvdb with validation
 bool AppFolder::load_search_series_from_tvdb(const char* name, const char* token) {
-    if (m_is_busy) return false;
-
-    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+    auto busy_lock = BusyLock(m_is_busy_mutex, m_is_busy, m_global_busy_count);
 
     auto search_opt = tvdb_api::search_series(name, token);
     if (!search_opt) {
@@ -87,10 +92,8 @@ bool AppFolder::load_search_series_from_tvdb(const char* name, const char* token
     return true;
 }
 
-// thread safe load series and episodes data from tvdb with validation, and store as cache
 bool AppFolder::load_cache_from_tvdb(uint32_t id, const char* token) {
-    if (m_is_busy) return false;
-    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+    auto busy_lock = BusyLock(m_is_busy_mutex, m_is_busy, m_global_busy_count);
 
     // attempt to fetch data from tvdb api
     auto series_opt = tvdb_api::get_series(id, token);
@@ -134,13 +137,11 @@ bool AppFolder::load_cache_from_tvdb(uint32_t id, const char* token) {
     const auto series_cache_path = fs::absolute(m_path / SERIES_CACHE_FN);
     const auto episodes_cache_path = fs::absolute(m_path / EPISODES_CACHE_FN);
     if (!util::write_document_to_file(series_cache_path.string().c_str(), series_doc)) {
-        auto lock = std::scoped_lock(m_errors_mutex);
         push_error("Failed to write series cache file");
         return false;
     }
 
     if (!util::write_document_to_file(episodes_cache_path.string().c_str(), episodes_doc)) {
-        auto lock = std::scoped_lock(m_errors_mutex);
         push_error("Failed to write episodes cache file");
         return false;
     }
@@ -148,10 +149,8 @@ bool AppFolder::load_cache_from_tvdb(uint32_t id, const char* token) {
     return true;
 }
 
-// thread safe load the cache from local file (series.json, episodes.json)
 bool AppFolder::load_cache_from_file() {
-    if (m_is_busy) return false;
-    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+    auto busy_lock = BusyLock(m_is_busy_mutex, m_is_busy, m_global_busy_count);
 
     // load cache from series folder
     // NOTE: We expect that this may not load since the cache hasn't been downloaded from api
@@ -195,15 +194,14 @@ bool AppFolder::load_cache_from_file() {
 }
 
 // update folder diff after cache has been loaded
-void AppFolder::update_state_from_cache() {
-    if (m_is_busy) return;
+bool AppFolder::update_state_from_cache() {
     if (!m_is_info_cached && !load_cache_from_file()) {
-        return;
+        return false;
     }
 
-    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
-    auto intents = get_directory_file_intents(m_path, m_cfg, m_cache);
+    auto busy_lock = BusyLock(m_is_busy_mutex, m_is_busy, m_global_busy_count);
 
+    auto intents = get_directory_file_intents(m_path, m_cfg, m_cache);
     auto new_state = std::make_unique<AppFolderState>();
     for (auto& intent: intents) {
         new_state->AddIntent(std::move(intent));
@@ -226,11 +224,11 @@ void AppFolder::update_state_from_cache() {
 
     auto lock = std::scoped_lock(m_state_mutex);
     m_state = std::move(new_state);
+    return true;
 }
 
 bool AppFolder::load_bookmarks_from_file() {
-    if (m_is_busy) return false;
-    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+    auto busy_lock = BusyLock(m_is_busy_mutex, m_is_busy, m_global_busy_count);
 
     const fs::path bookmarks_fn = m_path / BOOKMARKS_FN;
     auto res = util::load_document_from_file(bookmarks_fn.string().c_str());
@@ -254,8 +252,7 @@ bool AppFolder::load_bookmarks_from_file() {
 }
 
 bool AppFolder::save_bookmarks_to_file() {
-    if (m_is_busy) return false;
-    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+    auto busy_lock = BusyLock(m_is_busy_mutex, m_is_busy, m_global_busy_count);
 
     const fs::path bookmarks_fn = m_path / BOOKMARKS_FN;
 
@@ -274,13 +271,12 @@ bool AppFolder::save_bookmarks_to_file() {
     return true;    
 }
 
-// thread safe execute all actions in folder diff
-void AppFolder::execute_actions() {
-    if (m_is_busy) return;
-    auto scoped_hold = ScopedAtomic(m_is_busy, m_global_busy_count);
+int AppFolder::execute_actions() {
+    auto busy_lock = BusyLock(m_is_busy_mutex, m_is_busy, m_global_busy_count);
 
     auto lock = std::scoped_lock(m_state_mutex);
     auto& intents = m_state->GetIntents();
+    int total_errors = 0;
 
     // Remove deletes first to remove filepath conflicts where possible
     for (auto& [_, file_state]: intents) {
@@ -290,6 +286,7 @@ void AppFolder::execute_actions() {
                 execute_file_intent(m_path, intent);
             } catch (std::exception& e) {
                 push_error(e.what());
+                total_errors++;
             }
         }
     }
@@ -302,9 +299,12 @@ void AppFolder::execute_actions() {
                 execute_file_intent(m_path, intent);
             } catch (std::exception& e) {
                 push_error(e.what());
+                total_errors++;
             }
         }
     }
+
+    return total_errors;
 }
 
 // execute the shell command to open the folder or file

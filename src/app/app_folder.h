@@ -65,8 +65,10 @@ public:
     std::optional<tvdb_api::EpisodeKey> selected_episode = std::nullopt;
 
     // use this to keep count of the global count of busy folders
-    std::atomic<bool> m_is_busy;
+    bool m_is_busy;
     std::atomic<int>& m_global_busy_count;
+private:
+    std::mutex m_is_busy_mutex;
 public:
     AppFolder(
         const std::filesystem::path& path, 
@@ -77,12 +79,12 @@ public:
     //       Then the boolean indicates complete success
     bool load_cache_from_tvdb(uint32_t id, const char* token);
     bool load_cache_from_file();
-    void update_state_from_cache();
+    bool update_state_from_cache();
     bool load_search_series_from_tvdb(const char* name, const char* token);
     bool load_bookmarks_from_file();
     bool save_bookmarks_to_file();
 
-    void execute_actions();
+    int execute_actions();
     const auto&  GetPath() const { return m_path; }
     void open_folder(const std::string& path);
     void open_file(const std::string& path);
